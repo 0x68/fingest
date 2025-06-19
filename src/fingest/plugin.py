@@ -11,7 +11,7 @@ def pytest_addoption(parser):
     parser.addini(
         name="fingest_fixture_path",
         help="Base path for fixture data files",
-        default="data"
+        default="data",
     )
 
 
@@ -22,9 +22,10 @@ def pytest_configure(config):
 
 def data_fixture(file_path: str, description: str = ""):
     """
-    Decorator: register class as a data-backed fixture with optional 
+    Decorator: register class as a data-backed fixture with optional
     Description.
     """
+
     def wrapper(obj):
         _fixture_registry[obj.__name__] = {
             "obj": obj,
@@ -33,12 +34,13 @@ def data_fixture(file_path: str, description: str = ""):
             "is_class": isinstance(obj, type),
         }
         return obj
+
     return wrapper
 
 
 def _load_data(path: Path):
     """Loads data from file.
-    
+
     params:
     path: Path to the data file.
     raises: ValueError in case of invalid path file extension.
@@ -48,7 +50,7 @@ def _load_data(path: Path):
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     if path.suffix[1:].lower() == "csv":
-        with open(path, newline='', encoding="utf-8") as f:
+        with open(path, newline="", encoding="utf-8") as f:
             return list(csv.DictReader(f))
     if path.suffix[1:].lower() == "xml":
         return etree.parse(path)
@@ -65,7 +67,7 @@ class FixtureWrapper:
         return getattr(self._instance, item)
 
     def __repr__(self):
-        return f"{self._instance.__doc__}: {self._description}"
+        return f"{self._description}"
 
     def __str__(self):
         return f"{self._instance}  (Fixture description: {self._description})"

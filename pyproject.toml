@@ -1,7 +1,7 @@
 [project]
 name = "fingest"
-version = "0.0.1"
-description = ""
+version = "0.0.2"
+description = "This Pytest plugin allows you to easily define data-driven fixtures based on external files. It supports `JSON`, `CSV`, and `XML` data sources, and can automatically instantiate Python classes or functions using this data."
 authors = [
     {name = "Tim Fiedler",email = "tim@0x68.de"}
 ]
@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
     "pytest (>=8.3.5,<9.0.0)",
     "lxml (>=5.4.0,<6.0.0)",
+    "pytest-cov (>=6.2.1,<7.0.0)",
 ]
 
 classifiers = [
@@ -26,3 +27,11 @@ build-backend = "hatchling.build"
 
 [project.entry-points.pytest11]
 fingest = "fingest.plugin"
+
+
+license = "MIT"
+license-files = "LICENSE"
+
+[project.urls]
+Homepage = "https://github.com/0x68/fingest"
+Issues = "https://github.com/0x68/fingest/issues"
