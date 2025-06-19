@@ -67,7 +67,7 @@ class FixtureWrapper:
         return getattr(self._instance, item)
 
     def __repr__(self):
-        return f"{self._instance.__doc__}: {self._description}"
+        return f"{self._description}"
 
     def __str__(self):
         return f"{self._instance}  (Fixture description: {self._description})"
