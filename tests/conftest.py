@@ -3,18 +3,17 @@ from fingest.types import BaseFixture, JSONFixture
 
 
 @data_fixture("test.json", description="Das ist ein Test der fehl schlaegt")
-class JsonData(JSONFixture):
-    ...
+class JsonData(JSONFixture): ...
 
 
 @data_fixture("test.xml", description="Das ist ein Test der fehl schlaegt")
-class XMLData(BaseFixture):
-    ...
+class XMLData(BaseFixture): ...
 
 
 @data_fixture("test.csv", description="CSV File which is Dirty as Fck")
 class CSV(BaseFixture):
     """CSV File"""
+
     ...
 
 
