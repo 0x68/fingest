@@ -27,30 +27,55 @@ fingest_fixture_path = data  # Base directory for fixture data files
 
 ```
 
-## Example JSON
+## Example Conftest
 
 ```python
-
-from plugin import data_fixture
-
-@data_fixture("users.json", description="Example user list")
-class UserData:
-    def __init__(self, data):
-        self.users = data
+from fingest.plugin import data_fixture
+from fingest.types import BaseFixture, JSONFixture
 
 
+@data_fixture("test.json", description="JSON File Foo Bar")
+class JsonData(JSONFixture): ...
 
-def test_user_count(UserData):
-    assert len(UserData.users) > 0
 
+@data_fixture("test.xml", description="XML File Foo Bar")
+class XMLData(BaseFixture): ...
+
+
+@data_fixture("test.csv", description="CSV File FOO Bar")
+class CSV(BaseFixture):
+    """CSV File"""
+
+    ...
+
+
+@data_fixture("test.json", description="Func Bases")
+def json_test_file(data):
+    """Json File in func"""
+    return data
 ```
 
-## Example CSV
+## Example Test
 
 ```python
 
-@data_fixture("products.csv", description="Product list")
-def product_list(data):
-    return [p for p in data if p["available"] == "true"]
+def test_data_fixture(JsonData):
+    assert JsonData.data.get("Foo") == "Bar"
+
+
+def test_data_fixtute(JsonData):
+    assert JsonData.length() == 1
+
+
+def test_xml(XMLData):
+    assert XMLData
+
+
+def test_csv(CSV):
+    assert len(CSV.data) == 5
+
+
+def test_json_func(json_test_file):
+    assert json_test_file.get("Foo") == "Bar"
 
 ```

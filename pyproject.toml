@@ -1,37 +1,36 @@
-[project]
+[tool.poetry]
 name = "fingest"
 version = "0.0.2"
-description = "This Pytest plugin allows you to easily define data-driven fixtures based on external files. It supports `JSON`, `CSV`, and `XML` data sources, and can automatically instantiate Python classes or functions using this data."
+description = "Pytest plugin that allows you to easily define data-driven fixtures based on external files."
 authors = [
-    {name = "Tim Fiedler",email = "tim@0x68.de"}
+    "Tim Fiedler <tim@0x68.de>"
 ]
 readme = "README.md"
-requires-python = ">=3.11"
-dependencies = [
-    "pytest (>=8.3.5,<9.0.0)",
-    "lxml (>=5.4.0,<6.0.0)",
-    "pytest-cov (>=6.2.1,<7.0.0)",
-]
-
+license = "MIT"
+packages = [{ include = "fingest", from = "src" }]
+homepage = "https://github.com/0x68/fingest"
+repository = "https://github.com/0x68/fingest"
+keywords = ["pytest", "plugin", "fixtures", "data-driven"]
 classifiers = [
-  "Framework :: Pytest"
+  "Framework :: Pytest",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License"
 ]
 
-[tool.poetry]
-packages = [{include = "fingest", from = "src"}]
+[tool.poetry.dependencies]
+python = ">=3.11"
+pytest = ">=8.3.5,<9.0.0"
+lxml = ">=5.4.0,<6.0.0"
+pytest-cov = ">=6.2.1,<7.0.0"
 
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[project.entry-points.pytest11]
+[tool.poetry.plugins."pytest11"]
 fingest = "fingest.plugin"
 
-
-license = "MIT"
-license-files = "LICENSE"
-
-[project.urls]
+[tool.poetry.urls]
 Homepage = "https://github.com/0x68/fingest"
 Issues = "https://github.com/0x68/fingest/issues"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
