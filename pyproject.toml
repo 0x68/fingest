@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fingest"
-version = "0.0.2"
+version = "0.0.3"
 description = "Pytest plugin that allows you to easily define data-driven fixtures based on external files."
 authors = [
     "Tim Fiedler <tim@0x68.de>"
