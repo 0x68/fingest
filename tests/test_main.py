@@ -6,7 +6,7 @@ def fingest():
     return True
 
 def test_data_fixture(JsonData):
-    assert JsonData.data.get("Foo") == "Bari"
+    assert JsonData.data.get("Foo") == "Bar"
 
 
 def test_data_fixtute(JsonData):
