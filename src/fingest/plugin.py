@@ -3,6 +3,8 @@
 import csv
 import json
 import logging
+import inspect
+import functools
 from pathlib import Path
 from typing import Any, Dict
 import pytest
@@ -244,23 +246,71 @@ def pytest_sessionstart(session):
         custom_loader = info.get("loader")
 
         def create_fixture(obj=obj, path=path, desc=desc, loader=custom_loader):
-            @pytest.fixture(name=name)
-            def _fixture():
-                try:
-                    # Use custom loader if provided, otherwise use default
-                    if loader:
-                        data = loader(path)
-                    else:
-                        data = _load_data(path)
+            # Check if obj is a function and preserve its signature
+            if callable(obj) and not isinstance(obj, type):
+                # Get the original function's signature and parameters
+                sig = inspect.signature(obj)
+                params = list(sig.parameters.values())
 
-                    # Both classes and functions are called with data
-                    result = obj(data)
+                # Create a new signature that excludes the first 'data' parameter
+                # but keeps all other parameters (fixture dependencies)
+                if params and params[0].name in ['data', 'self']:
+                    new_params = params[1:]  # Skip the first parameter (data)
+                else:
+                    new_params = params
 
-                    return FixtureWrapper(result, desc)
-                except Exception as e:
-                    logger.error(f"Failed to create fixture {name}: {e}")
-                    raise
-            return _fixture
+                new_sig = sig.replace(parameters=new_params)
+
+                # Create a wrapper function that has the correct signature for pytest
+                def create_wrapper():
+                    def wrapper(*args, **kwargs):
+                        try:
+                            # Use custom loader if provided, otherwise use default
+                            if loader:
+                                data = loader(path)
+                            else:
+                                data = _load_data(path)
+
+                            # Call the original function with data as first argument,
+                            # followed by any fixture dependencies
+                            result = obj(data, *args, **kwargs)
+
+                            return FixtureWrapper(result, desc)
+                        except Exception as e:
+                            logger.error(f"Failed to create fixture {name}: {e}")
+                            raise
+
+                    # Set the signature to match the original function minus the data parameter
+                    wrapper.__signature__ = new_sig
+                    # Preserve other function attributes
+                    wrapper.__name__ = obj.__name__
+                    wrapper.__doc__ = obj.__doc__
+                    wrapper.__module__ = obj.__module__
+
+                    return wrapper
+
+                # Create the wrapper and apply the pytest.fixture decorator
+                wrapper_func = create_wrapper()
+                return pytest.fixture(name=name)(wrapper_func)
+            else:
+                # For classes, keep the original behavior
+                @pytest.fixture(name=name)
+                def _fixture():
+                    try:
+                        # Use custom loader if provided, otherwise use default
+                        if loader:
+                            data = loader(path)
+                        else:
+                            data = _load_data(path)
+
+                        # Both classes and functions are called with data
+                        result = obj(data)
+
+                        return FixtureWrapper(result, desc)
+                    except Exception as e:
+                        logger.error(f"Failed to create fixture {name}: {e}")
+                        raise
+                return _fixture
 
         # Register the fixture in pytest's fixture registry
         fixture_func = create_fixture()

@@ -59,3 +59,61 @@ def user_function_data(data):
 def product_function_data(data):
     """Function-based fixture for product data."""
     return data
+
+
+# Additional fixtures for testing signature preservation
+import pytest
+
+
+@pytest.fixture
+def mock_dependency():
+    """A mock dependency fixture."""
+    return "dependency_value"
+
+
+@pytest.fixture
+def another_dependency():
+    """Another mock dependency fixture."""
+    return {"key": "value"}
+
+
+@pytest.fixture
+def required_dep():
+    """A required dependency fixture for complex signature tests."""
+    return "required_dependency_value"
+
+
+# Test function-based fixture with dependencies
+@data_fixture("test.json", description="Function fixture with dependencies")
+def function_with_deps(data, mock_dependency, another_dependency):
+    """Function fixture that depends on other fixtures."""
+    return {
+        "data": data,
+        "mock_dep": mock_dependency,
+        "another_dep": another_dependency,
+        "combined": f"{mock_dependency}_{data.get('Foo', 'unknown')}"
+    }
+
+
+# Test function-based fixture with optional dependencies
+@data_fixture("test.json", description="Function fixture with optional dependencies")
+def function_with_optional_deps(data, mock_dependency, optional_param="default_value"):
+    """Function fixture with optional parameters."""
+    return {
+        "data": data,
+        "mock_dep": mock_dependency,
+        "optional": optional_param
+    }
+
+
+# Test function-based fixture with complex signature
+@data_fixture("test.json", description="Function fixture with complex signature")
+def function_with_complex_sig(data, required_dep, optional_dep="default", *args, **kwargs):
+    """Function fixture with complex signature including *args and **kwargs."""
+    return {
+        "data": data,
+        "required": required_dep,
+        "optional": optional_dep,
+        "args": args,
+        "kwargs": kwargs
+    }
