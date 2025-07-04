@@ -1,10 +1,119 @@
-import pytest
-import json
-import csv
-from lxml import etree
-from pathlib import Path
+"""Fingest pytest plugin for data-driven fixtures."""
 
-_fixture_registry = {}
+import csv
+import json
+import logging
+from pathlib import Path
+from typing import Any, Dict
+import pytest
+from lxml import etree
+
+# Global registry for data fixtures
+_fixture_registry: Dict[str, Dict[str, Any]] = {}
+
+# Registry for data loaders by file extension
+_loader_registry: Dict[str, Any] = {}
+
+# Logger for the plugin
+logger = logging.getLogger(__name__)
+
+
+class DataLoaderRegistry:
+    """Registry for data loaders by file extension."""
+
+    def __init__(self):
+        self._loaders: Dict[str, Any] = {}
+        self._register_default_loaders()
+
+    def _register_default_loaders(self):
+        """Register default loaders for common file types."""
+        self.register("json", self._load_json)
+        self.register("csv", self._load_csv)
+        self.register("xml", self._load_xml)
+
+    def register(self, extension: str, loader):
+        """Register a loader for a file extension.
+
+        Args:
+            extension: File extension (without dot).
+            loader: Function that takes a Path and returns loaded data.
+        """
+        self._loaders[extension.lower()] = loader
+        logger.debug(f"Registered loader for .{extension} files")
+
+    def get_loader(self, extension: str):
+        """Get a loader for a file extension.
+
+        Args:
+            extension: File extension (without dot).
+
+        Returns:
+            Loader function or None if not found.
+        """
+        return self._loaders.get(extension.lower())
+
+    def load_data(self, path: Path) -> Any:
+        """Load data from a file using the appropriate loader.
+
+        Args:
+            path: Path to the data file.
+
+        Returns:
+            Loaded data.
+
+        Raises:
+            FileNotFoundError: If the file doesn't exist.
+            ValueError: If the file format is unsupported or data is invalid.
+        """
+        if not path.exists():
+            raise FileNotFoundError(f"Data file not found: {path}")
+
+        if not path.is_file():
+            raise ValueError(f"Path is not a file: {path}")
+
+        extension = path.suffix[1:].lower()
+        loader = self.get_loader(extension)
+
+        if not loader:
+            raise ValueError(f"Unsupported file format: {extension}")
+
+        try:
+            return loader(path)
+        except Exception as e:
+            raise ValueError(f"Failed to load {path}: {e}") from e
+
+    @staticmethod
+    def _load_json(path: Path) -> Any:
+        """Load JSON data from file."""
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in file {path}: {e}") from e
+        except UnicodeDecodeError as e:
+            raise ValueError(f"Cannot decode JSON file {path}: {e}") from e
+
+    @staticmethod
+    def _load_csv(path: Path) -> Any:
+        """Load CSV data from file."""
+        try:
+            with open(path, newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                return list(reader)
+        except UnicodeDecodeError as e:
+            raise ValueError(f"Cannot decode CSV file {path}: {e}") from e
+
+    @staticmethod
+    def _load_xml(path: Path) -> Any:
+        """Load XML data from file."""
+        try:
+            return etree.parse(str(path))
+        except etree.XMLSyntaxError as e:
+            raise ValueError(f"Invalid XML in file {path}: {e}") from e
+
+
+# Global data loader registry
+_data_loader_registry = DataLoaderRegistry()
 
 
 def pytest_addoption(parser):
@@ -20,74 +129,139 @@ def pytest_configure(config):
     config.fingest_fixture_path = data_path
 
 
-def data_fixture(file_path: str, description: str = ""):
-    """
-    Decorator: register class as a data-backed fixture with optional
-    Description.
-    """
+def data_fixture(file_path: str, description: str = "", loader=None):
+    """Decorator to register a class or function as a data-backed fixture.
 
+    Args:
+        file_path: Path to the data file (relative to fingest_fixture_path).
+        description: Optional description for debugging and documentation.
+        loader: Optional custom data loader function.
+
+    Returns:
+        The decorated class or function.
+
+    Example:
+        @data_fixture("users.json", description="Test user data")
+        class UserData(JSONFixture):
+            pass
+
+        @data_fixture("config.yaml", loader=custom_yaml_loader)
+        def config_data(data):
+            return data
+    """
     def wrapper(obj):
         _fixture_registry[obj.__name__] = {
             "obj": obj,
             "path": Path(file_path),
             "description": description,
             "is_class": isinstance(obj, type),
+            "loader": loader
         }
+        logger.debug(f"Registered data fixture: {obj.__name__} -> {file_path}")
         return obj
 
     return wrapper
 
 
-def _load_data(path: Path):
-    """Loads data from file.
+def register_loader(extension: str, loader):
+    """Register a custom data loader for a file extension.
 
-    params:
-    path: Path to the data file.
-    raises: ValueError in case of invalid path file extension.
-    returns:
+    Args:
+        extension: File extension (without dot).
+        loader: Function that takes a Path and returns loaded data.
+
+    Example:
+        def yaml_loader(path):
+            import yaml
+            with open(path) as f:
+                return yaml.safe_load(f)
+
+        register_loader("yaml", yaml_loader)
     """
-    if path.suffix[1:].lower() == "json":
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    if path.suffix[1:].lower() == "csv":
-        with open(path, newline="", encoding="utf-8") as f:
-            return list(csv.DictReader(f))
-    if path.suffix[1:].lower() == "xml":
-        return etree.parse(path)
-    else:
-        raise ValueError(f"Unsupported format: {path.suffix[1:].lower()}")
+    _data_loader_registry.register(extension, loader)
+
+
+def _load_data(path: Path) -> Any:
+    """Load data from a file using the global data loader registry.
+
+    Args:
+        path: Path to the data file.
+
+    Returns:
+        Loaded data.
+
+    Raises:
+        FileNotFoundError: If the file doesn't exist.
+        ValueError: If the file format is unsupported or data is invalid.
+    """
+    return _data_loader_registry.load_data(path)
 
 
 class FixtureWrapper:
+    """Wrapper for fixture instances that adds description and delegates all operations."""
+
     def __init__(self, instance, description: str):
         self._instance = instance
         self._description = description
 
     def __getattr__(self, item):
+        """Delegate attribute access to the wrapped instance."""
         return getattr(self._instance, item)
 
+    def __getitem__(self, key):
+        """Delegate indexing to the wrapped instance."""
+        return self._instance[key]
+
+    def __len__(self):
+        """Delegate len() to the wrapped instance."""
+        return len(self._instance)
+
+    def __bool__(self):
+        """Delegate bool() to the wrapped instance."""
+        return bool(self._instance)
+
+    def __iter__(self):
+        """Delegate iteration to the wrapped instance."""
+        return iter(self._instance)
+
     def __repr__(self):
+        """Return the description as representation."""
         return f"{self._description}"
 
     def __str__(self):
+        """Return a detailed string representation."""
         return f"{self._instance}  (Fixture description: {self._description})"
 
 
 def pytest_sessionstart(session):
-    """
-    Generate real fixtures at test session start.
-    """
+    """Generate real fixtures at test session start."""
     data_root = getattr(session.config, "fingest_fixture_path", "data")
+
     for name, info in _fixture_registry.items():
         obj = info["obj"]
         path = Path(data_root) / Path(info["path"])
         desc = info["description"]
-        is_class = info["is_class"]
+        custom_loader = info.get("loader")
 
-        @pytest.fixture(name=name)
-        def _fixture(obj=obj, path=path, desc=desc, is_class=is_class):
-            data = _load_data(path)
-            result = obj(data) if is_class else obj(data)
-            return FixtureWrapper(result, desc)
+        def create_fixture(obj=obj, path=path, desc=desc, loader=custom_loader):
+            @pytest.fixture(name=name)
+            def _fixture():
+                try:
+                    # Use custom loader if provided, otherwise use default
+                    if loader:
+                        data = loader(path)
+                    else:
+                        data = _load_data(path)
 
-        globals()[name] = _fixture
+                    # Both classes and functions are called with data
+                    result = obj(data)
+
+                    return FixtureWrapper(result, desc)
+                except Exception as e:
+                    logger.error(f"Failed to create fixture {name}: {e}")
+                    raise
+            return _fixture
+
+        # Register the fixture in pytest's fixture registry
+        fixture_func = create_fixture()
+        globals()[name] = fixture_func
