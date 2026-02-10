@@ -53,16 +53,11 @@ class TestIntegrationSignaturePreservation:
         assert function_with_complex_sig["args"] == ()
         assert function_with_complex_sig["kwargs"] == {}
     
-    def test_fixture_wrapper_functionality(self, function_with_deps):
-        """Test that the FixtureWrapper functionality is preserved."""
-        # The fixture should be wrapped in FixtureWrapper
-        # Check that we can access the description
-        assert hasattr(function_with_deps, '_description')
-        
-        # The wrapper should delegate to the underlying instance
+    def test_function_fixture_data_access(self, function_with_deps):
+        """Test that function fixture data is directly accessible."""
+        # Function fixtures return their result directly
+        assert isinstance(function_with_deps, dict)
         assert function_with_deps["data"]["Foo"] == "Bar"
-        
-        # Test iteration if the underlying object supports it
         assert len(function_with_deps) > 0
     
     def test_error_handling_in_fixture_creation(self):

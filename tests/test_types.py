@@ -77,6 +77,87 @@ class TestBaseFixture:
         assert "BaseFixture" in repr_str
         assert "data=" in repr_str
 
+    def test_repr_with_description(self):
+        """Test __repr__ with description shows description instead of data."""
+        fixture = BaseFixture({"a": 1}, description="my desc")
+        assert repr(fixture) == "BaseFixture('my desc')"
+
+    def test_repr_truncates_long_data(self):
+        """Test __repr__ truncates data exceeding 80 chars."""
+        big_data = {f"key_{i}": f"value_{i}" for i in range(50)}
+        fixture = BaseFixture(big_data)
+        r = repr(fixture)
+        # repr should be reasonably short, not a wall of text
+        assert len(r) < 200
+        assert "..." in r
+
+    def test_str_truncates_long_data(self):
+        """Test __str__ truncates data exceeding 80 chars."""
+        big_data = list(range(100))
+        fixture = BaseFixture(big_data, description="big list")
+        s = str(fixture)
+        assert "..." in s
+        assert "big list" in s
+
+    def test_iter_with_list(self):
+        """Test __iter__ with list data."""
+        data = [1, 2, 3]
+        fixture = BaseFixture(data)
+        assert list(fixture) == [1, 2, 3]
+
+    def test_iter_with_dict(self):
+        """Test __iter__ with dict iterates over keys."""
+        data = {"a": 1, "b": 2}
+        fixture = BaseFixture(data)
+        assert set(fixture) == {"a", "b"}
+
+    def test_iter_with_string(self):
+        """Test __iter__ with string data."""
+        fixture = BaseFixture("abc")
+        assert list(fixture) == ["a", "b", "c"]
+
+    def test_contains_with_list(self):
+        """Test __contains__ with list data."""
+        fixture = BaseFixture([10, 20, 30])
+        assert 20 in fixture
+        assert 99 not in fixture
+
+    def test_contains_with_dict(self):
+        """Test __contains__ with dict checks keys."""
+        fixture = BaseFixture({"x": 1, "y": 2})
+        assert "x" in fixture
+        assert "z" not in fixture
+
+    def test_contains_with_string(self):
+        """Test __contains__ with string data."""
+        fixture = BaseFixture("hello world")
+        assert "hello" in fixture
+        assert "xyz" not in fixture
+
+    def test_eq_same_data(self):
+        """Test __eq__ with identical data and description."""
+        a = BaseFixture({"k": "v"}, description="test")
+        b = BaseFixture({"k": "v"}, description="test")
+        assert a == b
+
+    def test_eq_different_data(self):
+        """Test __eq__ with different data."""
+        a = BaseFixture([1, 2])
+        b = BaseFixture([3, 4])
+        assert a != b
+
+    def test_eq_different_description(self):
+        """Test __eq__ with different descriptions."""
+        a = BaseFixture([1], description="one")
+        b = BaseFixture([1], description="two")
+        assert a != b
+
+    def test_eq_not_a_fixture(self):
+        """Test __eq__ returns NotImplemented for non-fixture objects."""
+        fixture = BaseFixture([1])
+        assert fixture != "not a fixture"
+        assert fixture != 42
+
 
 class TestJSONFixture:
     """Test JSONFixture class."""
@@ -176,6 +257,28 @@ class TestJSONFixture:
         assert fixture[1] == {"id": 2}
         assert fixture[2] == {"id": 3}
 
+    def test_iter_with_dict(self):
+        """Test __iter__ on dict-backed JSONFixture iterates over keys."""
+        fixture = JSONFixture({"a": 1, "b": 2, "c": 3})
+        assert set(fixture) == {"a", "b", "c"}
+
+    def test_iter_with_list(self):
+        """Test __iter__ on list-backed JSONFixture iterates over items."""
+        fixture = JSONFixture([10, 20, 30])
+        assert list(fixture) == [10, 20, 30]
+
+    def test_contains_with_dict(self):
+        """Test __contains__ checks keys for dict data."""
+        fixture = JSONFixture({"name": "John", "age": 30})
+        assert "name" in fixture
+        assert "missing" not in fixture
+
+    def test_contains_with_list(self):
+        """Test __contains__ checks items for list data."""
+        fixture = JSONFixture([1, 2, 3])
+        assert 2 in fixture
+        assert 99 not in fixture
+
 
 class TestCSVFixture:
     """Test CSVFixture class."""
@@ -197,6 +300,21 @@ class TestCSVFixture:
         ]
         fixture = CSVFixture(data)
         assert fixture.rows == data
+
+    def test_row_count_property(self):
+        """Test row_count property."""
+        data = [
+            {"name": "John", "age": "30"},
+            {"name": "Jane", "age": "25"},
+            {"name": "Bob", "age": "35"},
+        ]
+        fixture = CSVFixture(data)
+        assert fixture.row_count == 3
+
+    def test_row_count_empty(self):
+        """Test row_count on empty data."""
+        fixture = CSVFixture([])
+        assert fixture.row_count == 0
     
     def test_columns_property(self):
         """Test columns property."""
@@ -268,6 +386,36 @@ class TestCSVFixture:
         fixture = CSVFixture(data)
         result = fixture.filter_rows(age="40")
         assert result == []
+
+    def test_filter_rows_with_callable_predicate(self):
+        """Test filter_rows with a callable predicate instead of literal value."""
+        data = [
+            {"name": "Laptop", "price": "999.99"},
+            {"name": "Mouse", "price": "29.99"},
+            {"name": "Monitor", "price": "499.99"},
+        ]
+        fixture = CSVFixture(data)
+
+        expensive = fixture.filter_rows(price=lambda p: float(p) > 100)
+        assert len(expensive) == 2
+        assert expensive[0]["name"] == "Laptop"
+        assert expensive[1]["name"] == "Monitor"
+
+    def test_filter_rows_mixed_callable_and_literal(self):
+        """Test filter_rows mixing callable predicates and literal values."""
+        data = [
+            {"name": "A", "category": "X", "score": "80"},
+            {"name": "B", "category": "X", "score": "40"},
+            {"name": "C", "category": "Y", "score": "90"},
+        ]
+        fixture = CSVFixture(data)
+
+        result = fixture.filter_rows(
+            category="X",
+            score=lambda s: int(s) > 50,
+        )
+        assert len(result) == 1
+        assert result[0]["name"] == "A"
     
     def test_getitem(self):
         """Test __getitem__ method."""
@@ -278,6 +426,26 @@ class TestCSVFixture:
         fixture = CSVFixture(data)
         assert fixture[0] == {"name": "John", "age": "30"}
         assert fixture[1] == {"name": "Jane", "age": "25"}
+
+    def test_iter(self):
+        """Test __iter__ iterates over rows."""
+        data = [
+            {"name": "John"},
+            {"name": "Jane"},
+        ]
+        fixture = CSVFixture(data)
+        names = [row["name"] for row in fixture]
+        assert names == ["John", "Jane"]
+
+    def test_contains_row(self):
+        """Test __contains__ checks for row membership."""
+        data = [
+            {"name": "John", "age": "30"},
+            {"name": "Jane", "age": "25"},
+        ]
+        fixture = CSVFixture(data)
+        assert {"name": "John", "age": "30"} in fixture
+        assert {"name": "Bob", "age": "40"} not in fixture
 
 
 class TestXMLFixture:
@@ -301,6 +469,15 @@ class TestXMLFixture:
         fixture = XMLFixture(element_tree)
         root = fixture.root
         assert root.tag == "configuration"
+
+    def test_tag_property(self):
+        """Test tag shortcut property."""
+        xml_string = "<myroot><child/></myroot>"
+        tree = etree.fromstring(xml_string)
+        element_tree = etree.ElementTree(tree)
+
+        fixture = XMLFixture(element_tree)
+        assert fixture.tag == "myroot"
     
     def test_find_method(self):
         """Test find method."""
@@ -401,3 +578,70 @@ class TestXMLFixture:
         # Test non-existent element without default
         missing_no_default = fixture.get_text("settings/missing")
         assert missing_no_default == ""
+
+    def test_to_dict_simple(self):
+        """Test to_dict with a simple XML structure."""
+        xml_string = """
+        <config>
+            <host>localhost</host>
+            <port>5432</port>
+        </config>
+        """
+        tree = etree.fromstring(xml_string)
+        element_tree = etree.ElementTree(tree)
+        fixture = XMLFixture(element_tree)
+
+        d = fixture.to_dict()
+        assert d["config"]["host"] == "localhost"
+        assert d["config"]["port"] == "5432"
+
+    def test_to_dict_with_attributes(self):
+        """Test to_dict preserves element attributes under @key."""
+        xml_string = '<item id="1" active="true">hello</item>'
+        tree = etree.fromstring(xml_string)
+        element_tree = etree.ElementTree(tree)
+        fixture = XMLFixture(element_tree)
+
+        d = fixture.to_dict()
+        assert d["item"]["@id"] == "1"
+        assert d["item"]["@active"] == "true"
+        assert d["item"]["#text"] == "hello"
+
+    def test_to_dict_with_repeated_children(self):
+        """Test to_dict collapses repeated tags into a list."""
+        xml_string = """
+        <root>
+            <item>one</item>
+            <item>two</item>
+            <item>three</item>
+        </root>
+        """
+        tree = etree.fromstring(xml_string)
+        element_tree = etree.ElementTree(tree)
+        fixture = XMLFixture(element_tree)
+
+        d = fixture.to_dict()
+        items = d["root"]["item"]
+        assert isinstance(items, list)
+        assert len(items) == 3
+        assert items[0] == "one"
+        assert items[2] == "three"
+
+    def test_to_dict_nested(self):
+        """Test to_dict with nested elements."""
+        xml_string = """
+        <config>
+            <database>
+                <host>localhost</host>
+                <port>5432</port>
+            </database>
+        </config>
+        """
+        tree = etree.fromstring(xml_string)
+        element_tree = etree.ElementTree(tree)
+        fixture = XMLFixture(element_tree)
+
+        d = fixture.to_dict()
+        db = d["config"]["database"]
+        assert db["host"] == "localhost"
+        assert db["port"] == "5432"

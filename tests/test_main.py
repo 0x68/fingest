@@ -9,7 +9,7 @@ def test_data_fixture(JsonData):
     assert JsonData.data.get("Foo") == "Bar"
 
 
-def test_data_fixtute(JsonData):
+def test_data_fixture_length(JsonData):
     assert JsonData.length() == 1
 
 
