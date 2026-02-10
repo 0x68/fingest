@@ -5,8 +5,17 @@ It supports JSON, CSV, and XML data sources, and can automatically instantiate
 Python classes or functions using this data.
 """
 
+from .adapters import (
+    AzureBlobAdapter,
+    CloudAdapter,
+    GCSAdapter,
+    S3Adapter,
+    aws_bucket_fixture,
+    azure_blob_fixture,
+    gcs_fixture,
+)
 from .plugin import data_fixture, register_loader
-from .types import BaseFixture, JSONFixture, CSVFixture, XMLFixture
+from .types import BaseFixture, CSVFixture, JSONFixture, XMLFixture
 
 __version__ = "0.1.0"
 __author__ = "Tim Fiedler"
@@ -18,5 +27,12 @@ __all__ = [
     "BaseFixture",
     "JSONFixture",
     "CSVFixture",
-    "XMLFixture"
+    "XMLFixture",
+    "aws_bucket_fixture",
+    "gcs_fixture",
+    "azure_blob_fixture",
+    "CloudAdapter",
+    "S3Adapter",
+    "GCSAdapter",
+    "AzureBlobAdapter",
 ]

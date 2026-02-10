@@ -37,8 +37,7 @@ class TestJSONFixtures:
     
     def test_user_function_data(self, user_function_data):
         """Test function-based JSON fixture."""
-        # Function-based fixtures are also wrapped, so we need to access the data
-        assert isinstance(user_function_data._instance, list)
+        assert isinstance(user_function_data, list)
         assert len(user_function_data) == 3
         assert user_function_data[0]["name"] == "John Doe"
 
@@ -79,8 +78,7 @@ class TestCSVFixtures:
     
     def test_product_function_data(self, product_function_data):
         """Test function-based CSV fixture."""
-        # Function-based fixtures are also wrapped, so we need to access the data
-        assert isinstance(product_function_data._instance, list)
+        assert isinstance(product_function_data, list)
         assert len(product_function_data) == 5
         assert product_function_data[0]["name"] == "Laptop"
 
@@ -137,16 +135,15 @@ class TestXMLFixtures:
 class TestFixtureDescriptions:
     """Test fixture descriptions and metadata."""
 
-    def test_fixture_wrapper_description(self, user_data):
-        """Test that fixture wrapper contains description."""
-        # The FixtureWrapper should have the description
-        assert hasattr(user_data, '_description')
-        # Note: The actual description access depends on FixtureWrapper implementation
+    def test_fixture_description(self, user_data):
+        """Test that fixture contains description."""
+        assert hasattr(user_data, 'description')
+        assert user_data.description == "User data from JSON"
 
-    def test_fixture_wrapper_str(self, user_data):
-        """Test string representation of fixture wrapper."""
+    def test_fixture_str(self, user_data):
+        """Test string representation of fixture."""
         str_repr = str(user_data)
-        assert "User data from JSON" in str_repr or "Fixture description" in str_repr
+        assert "User data from JSON" in str_repr
 
 
 class TestBaseFixture:
@@ -164,5 +161,4 @@ class TestBaseFixture:
     def test_base_fixture_repr(self, simple_data):
         """Test string representation of fixtures."""
         repr_str = repr(simple_data)
-        # FixtureWrapper returns the description in __repr__
         assert "Simple JSON test data" in repr_str

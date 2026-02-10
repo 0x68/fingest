@@ -1,318 +1,229 @@
-# Fingest - Pytest Data-Driven Fixtures Plugin
+# Fingest — Pytest Data-Driven Fixtures
 
 [![PyPI version](https://badge.fury.io/py/fingest.svg)](https://badge.fury.io/py/fingest)
 [![Python versions](https://img.shields.io/pypi/pyversions/fingest.svg)](https://pypi.org/project/fingest/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Fingest is a powerful pytest plugin that enables **data-driven testing** by automatically creating fixtures from external data files. It supports JSON, CSV, and XML formats out of the box, with extensible support for custom data loaders.
+A pytest plugin that turns **JSON, CSV, and XML files** into fully-typed, iterable test fixtures — no boilerplate required.
 
-## ✨ Features
+## Quick Start
 
-- 🚀 **Automatic fixture registration** from data files
-- 📁 **Multiple format support**: JSON, CSV, XML (extensible)
-- 🎯 **Type-specific base classes** with rich functionality
-- 🔧 **Custom data loaders** for any file format
-- 📝 **Descriptive fixtures** for better test documentation
-- ⚙️ **Configurable data paths** via pytest.ini
-- 🧪 **Comprehensive test coverage** (84 tests, 100% pass rate)
-
-## 📦 Installation
-
-Install from PyPI:
+### 1. Install
 
 ```bash
 pip install fingest
 ```
 
-Or with Poetry:
-
-```bash
-poetry add fingest
-```
-
-## 🚀 Quick Start
-
-### 1. Configure pytest.ini
+### 2. Point pytest at your data
 
 ```ini
+# pytest.ini  (or pyproject.toml under [tool.pytest.ini_options])
 [pytest]
-fingest_fixture_path = tests/data  # Path to your data files
+fingest_fixture_path = tests/data
 ```
 
-### 2. Create data files
-
-**users.json**
-```json
-[
-  {"id": 1, "name": "Alice", "email": "alice@example.com"},
-  {"id": 2, "name": "Bob", "email": "bob@example.com"}
-]
-```
-
-**products.csv**
-```csv
-id,name,price,category
-1,Laptop,999.99,Electronics
-2,Mouse,29.99,Electronics
-```
-
-**config.xml**
-```xml
-<?xml version="1.0"?>
-<config>
-    <database>
-        <host>localhost</host>
-        <port>5432</port>
-    </database>
-</config>
-```
-
-### 3. Define fixtures in conftest.py
+### 3. Define fixtures in `conftest.py`
 
 ```python
 from fingest import data_fixture, JSONFixture, CSVFixture, XMLFixture
 
 @data_fixture("users.json", description="Test user data")
 class user_data(JSONFixture):
-    """Fixture for user test data."""
     pass
 
 @data_fixture("products.csv", description="Product catalog")
 class product_data(CSVFixture):
-    """Fixture for product data."""
     pass
 
 @data_fixture("config.xml", description="App configuration")
 class config_data(XMLFixture):
-    """Fixture for configuration data."""
     pass
 ```
 
-### 4. Use in your tests
+### 4. Use them in tests
 
 ```python
-def test_user_count(user_data):
+def test_users(user_data):
     assert len(user_data) == 2
-    assert user_data[0]["name"] == "Alice"
+    assert "Alice" in [u["name"] for u in user_data]  # iterable!
 
-def test_product_filtering(product_data):
-    electronics = product_data.filter_rows(category="Electronics")
-    assert len(electronics) == 2
+def test_expensive_products(product_data):
+    expensive = product_data.filter_rows(price=lambda p: float(p) > 100)
+    assert len(expensive) >= 1
 
-def test_database_config(config_data):
-    host = config_data.get_text("database/host")
-    assert host == "localhost"
+def test_db_host(config_data):
+    assert config_data.get_text("database/host") == "localhost"
 ```
 
-## 📚 Comprehensive Guide
+---
 
-### Fixture Types
+## Fixture Types
 
-Fingest provides specialized fixture classes for different data formats:
+### `BaseFixture`
 
-#### JSONFixture
-For JSON data with dictionary and list operations:
+All fixtures inherit from `BaseFixture`, which gives you:
+
+| Feature | Example |
+|---|---|
+| Length | `len(fixture)` |
+| Truthiness | `if fixture:` |
+| Iteration | `for item in fixture:` |
+| Containment | `"key" in fixture` |
+| Equality | `fixture_a == fixture_b` |
+| Raw data | `fixture.data` |
+
+### `JSONFixture`
+
+For dict or list JSON data.
 
 ```python
-@data_fixture("api_response.json")
-class api_data(JSONFixture):
-    pass
-
-def test_json_operations(api_data):
-    # Access dictionary methods
-    assert "users" in api_data.keys()
-    user_count = api_data.get("user_count", 0)
-
-    # Direct indexing
-    first_user = api_data["users"][0]
-    assert first_user["active"] is True
+fixture["users"]          # direct indexing
+fixture.get("key", None)  # safe access
+fixture.keys()            # dict keys
+for key in fixture:       # iterate keys (dict) or items (list)
+"name" in fixture         # containment check
 ```
 
-#### CSVFixture
-For CSV data with row and column operations:
+### `CSVFixture`
+
+For tabular CSV data.
 
 ```python
-@data_fixture("sales_data.csv")
-class sales_data(CSVFixture):
-    pass
+fixture.rows              # all rows as list of dicts
+fixture.row_count         # number of rows
+fixture.columns           # column names
+fixture.get_column("age") # all values from one column
+fixture[0]                # first row
 
-def test_csv_operations(sales_data):
-    # Get all column names
-    columns = sales_data.columns
-    assert "product_name" in columns
+# filter with exact values or predicates
+fixture.filter_rows(city="NYC")
+fixture.filter_rows(price=lambda p: float(p) > 100)
 
-    # Get specific column values
-    prices = sales_data.get_column("price")
-    assert all(float(p) > 0 for p in prices)
-
-    # Filter rows
-    expensive_items = sales_data.filter_rows(price="999.99")
-    assert len(expensive_items) > 0
+for row in fixture:       # iterate rows
+{"name": "Bob"} in fixture  # row membership
 ```
 
-#### XMLFixture
-For XML data with XPath and element operations:
+### `XMLFixture`
+
+For XML data, powered by lxml.
 
 ```python
-@data_fixture("settings.xml")
-class settings_data(XMLFixture):
-    pass
-
-def test_xml_operations(settings_data):
-    # Find single elements
-    timeout = settings_data.find("timeout")
-    assert timeout.text == "30"
-
-    # Find multiple elements
-    features = settings_data.findall("features/feature")
-    assert len(features) == 3
-
-    # XPath queries
-    enabled_features = settings_data.xpath("//feature[@enabled='true']")
-    assert len(enabled_features) == 2
-
-    # Get text with default
-    debug_mode = settings_data.get_text("debug", "false")
-    assert debug_mode in ["true", "false"]
+fixture.root              # root Element
+fixture.tag               # root tag name
+fixture.find("db/host")   # first matching element
+fixture.findall("items/item")  # all matches
+fixture.xpath("//feature[@enabled='true']")
+fixture.get_text("settings/timeout", default="30")
+fixture.to_dict()         # recursive XML → dict conversion
 ```
 
-### Function-Based Fixtures
+---
 
-You can also create function-based fixtures for custom data processing:
+## Cloud Storage Adapters
+
+Fingest includes decorators for **AWS S3**, **GCP GCS**, and **Azure Blob Storage**. These are designed for **mock-first development**: by default, they load data from your local `fingest_fixture_path`, simulating cloud responses.
+
+### 1. Define Cloud Fixtures
 
 ```python
-@data_fixture("raw_data.json", description="Processed user data")
+from fingest import aws_bucket_fixture, gcs_fixture, azure_blob_fixture
+from fingest import JSONFixture, CSVFixture, XMLFixture
+
+# AWS S3 (Bucket: "my-bucket", Key: "data/users.json")
+@aws_bucket_fixture("my-bucket", "data/users.json", description="S3 users")
+class s3_users(JSONFixture): pass
+
+# GCP GCS (Bucket: "my-bucket", Key: "data/products.csv")
+@gcs_fixture("my-bucket", "data/products.csv", description="GCS products")
+class gcs_products(CSVFixture): pass
+
+# Azure Blob (Container: "my-container", Blob: "data/config.xml")
+@azure_blob_fixture("my-container", "data/config.xml", description="Azure config")
+class azure_config(XMLFixture): pass
+```
+
+### 2. Mocking vs. Live Mode
+
+The adapters are in **mock mode** by default. They will look for files in your local fixture directory (e.g., `tests/data/data/users.json`). 
+
+To enable **live mode** (hitting the real cloud SDKs), set `mock=False`. Note that cloud SDKs (`boto3`, `google-cloud-storage`, `azure-storage-blob`) are optional dependencies and must be installed separately.
+
+```python
+@aws_bucket_fixture("my-bucket", "data/users.json", mock=False)
+class live_s3_data(JSONFixture): pass
+```
+
+---
+
+## Function-Based Fixtures
+
+For custom data transformations or fixtures that depend on other pytest fixtures:
+
+```python
+@data_fixture("raw_data.json")
 def processed_users(data):
-    """Transform raw user data."""
-    return [
-        {
-            "id": user["id"],
-            "display_name": f"{user['first_name']} {user['last_name']}",
-            "email": user["email"].lower()
-        }
-        for user in data["users"]
-    ]
+    """data is injected by fingest; remaining params are pytest fixtures."""
+    return [{"name": f"{u['first']} {u['last']}"} for u in data["users"]]
 
-def test_processed_data(processed_users):
-    assert processed_users[0]["display_name"] == "John Doe"
-    assert "@" in processed_users[0]["email"]
+@data_fixture("config.json")
+def config_with_db(data, database_fixture):
+    """Depends on another pytest fixture — works seamlessly."""
+    return {"config": data, "db": database_fixture}
 ```
 
-### Custom Data Loaders
+## Custom Data Loaders
 
-Extend Fingest to support any file format:
+Support any file format by registering a loader:
 
 ```python
 from fingest import register_loader
 import yaml
 
 def yaml_loader(path):
-    with open(path, 'r') as f:
+    with open(path) as f:
         return yaml.safe_load(f)
 
-# Register the loader globally
 register_loader("yaml", yaml_loader)
-
-# Or use it for specific fixtures
-@data_fixture("config.yaml", loader=yaml_loader)
-class yaml_config(BaseFixture):
-    pass
 ```
 
-### Advanced Configuration
-
-#### Multiple Data Directories
-
-```ini
-[pytest]
-fingest_fixture_path = tests/fixtures
-```
-
-#### Environment-Specific Data
+Or use a one-off loader for a single fixture:
 
 ```python
-import os
-from fingest import data_fixture
-
-env = os.getenv("TEST_ENV", "dev")
-
-@data_fixture(f"config_{env}.json", description=f"Config for {env}")
-class environment_config(JSONFixture):
+@data_fixture("data.toml", loader=toml_loader)
+class toml_config(BaseFixture):
     pass
 ```
 
-## 🔧 API Reference
+---
 
-### Decorators
+## API Reference
 
-#### `@data_fixture(file_path, description="", loader=None)`
+### `@data_fixture(file_path, description="", loader=None)`
 
 Register a class or function as a data-driven fixture.
 
-**Parameters:**
-- `file_path` (str): Path to data file relative to `fingest_fixture_path`
-- `description` (str, optional): Description for debugging and documentation
-- `loader` (callable, optional): Custom data loader function
+| Parameter | Type | Description |
+|---|---|---|
+| `file_path` | `str` | Path to data file, relative to `fingest_fixture_path` |
+| `description` | `str` | Optional label for debugging / docs |
+| `loader` | `callable` | Optional custom loader `(Path) → Any` |
+
+### `register_loader(extension, loader_func)`
+
+Register a custom data loader globally for a file extension (without dot).
 
 ### Base Classes
 
-#### `BaseFixture`
-- `data`: Access to raw loaded data
-- `__len__()`: Get data length
-- `__bool__()`: Check if data exists and is non-empty
+| Class | Key Methods |
+|---|---|
+| `BaseFixture` | `data`, `description`, `len()`, `bool()`, `iter()`, `in`, `==` |
+| `JSONFixture` | `keys()`, `values()`, `items()`, `get()`, `length()`, `[]` |
+| `CSVFixture` | `rows`, `row_count`, `columns`, `get_column()`, `filter_rows()`, `[]` |
+| `XMLFixture` | `root`, `tag`, `find()`, `findall()`, `xpath()`, `get_text()`, `to_dict()` |
 
-#### `JSONFixture(BaseFixture)`
-- `keys()`, `values()`, `items()`: Dictionary methods (if data is dict)
-- `get(key, default=None)`: Safe key access
-- `length()`: Get data length
-- `__getitem__(key)`: Direct indexing
+---
 
-#### `CSVFixture(BaseFixture)`
-- `rows`: List of all rows
-- `columns`: List of column names
-- `get_column(name)`: Get all values from a column
-- `filter_rows(**kwargs)`: Filter rows by column values
-- `__getitem__(index)`: Get row by index
-
-#### `XMLFixture(BaseFixture)`
-- `root`: Root XML element
-- `find(path)`: Find first element matching XPath
-- `findall(path)`: Find all elements matching XPath
-- `xpath(path)`: Execute XPath query
-- `get_text(path, default="")`: Get text content with default
-
-### Functions
-
-#### `register_loader(extension, loader_func)`
-
-Register a custom data loader for a file extension.
-
-**Parameters:**
-- `extension` (str): File extension without dot (e.g., "yaml")
-- `loader_func` (callable): Function that takes a Path and returns loaded data
-
-## 🧪 Testing
-
-Run the test suite:
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=fingest
-
-# Run specific test categories
-pytest tests/test_types.py      # Test fixture types
-pytest tests/test_plugin.py     # Test plugin functionality
-pytest tests/test_fixtures.py   # Test fixture integration
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
-
-### Development Setup
+## Development
 
 ```bash
 git clone https://github.com/0x68/fingest.git
@@ -321,30 +232,9 @@ poetry install
 poetry run pytest
 ```
 
-## 📄 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Built with [pytest](https://pytest.org/) plugin architecture
-- XML processing powered by [lxml](https://lxml.de/)
-- Inspired by the need for better data-driven testing in Python
-
-## 📈 Changelog
-
-### v0.1.0 (Latest)
-- ✨ Complete rewrite with improved architecture
-- 🚀 Added specialized fixture classes (JSONFixture, CSVFixture, XMLFixture)
-- 🔧 Custom data loader support
-- 📝 Comprehensive documentation and examples
-- 🧪 84 comprehensive tests with 100% pass rate
-- 🐛 Fixed critical bugs in data loading and fixture registration
-- ⚡ Improved error handling and validation
-
-### v0.0.3
-- Basic JSON, CSV, and XML support
-- Simple fixture registration
+MIT — see [LICENSE](LICENSE).
 
 ---
 
