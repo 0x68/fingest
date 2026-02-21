@@ -25,6 +25,11 @@ jobs:
       with:
         python-version: ${{ matrix.pypy-version }}
         cache: 'pip'
+    
+    - name: Install System XML Libraries
+      run: |
+          sudo apt-get update
+          sudo apt-get install -y libxml2-dev libxslt-dev
 
     - name: Install dependencies
       run: |
