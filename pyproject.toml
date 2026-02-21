@@ -1,6 +1,6 @@
 [project]
 name = "fingest"
-version = "0.1.0"
+version = "1.0.0"
 description = "Pytest plugin that allows you to easily define data-driven fixtures based on external files."
 authors = [
     { name = "Tim Fiedler", email = "tim@0x68.de" }
@@ -50,6 +50,10 @@ dev = [
   "flake8 >=7.0.0",
   "mypy >=1.8.0",
   "pre-commit >=3.6.0",
+]
+lint = [
+    "ruff>=0.15.2",
+    "ty>=0.0.18",
 ]
 
 # Black configuration
