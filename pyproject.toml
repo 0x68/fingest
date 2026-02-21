@@ -1,6 +1,6 @@
 [project]
 name = "fingest"
-version = "1.0.0"
+version = "1.0.4"
 description = "Pytest plugin that allows you to easily define data-driven fixtures based on external files."
 authors = [
     { name = "Tim Fiedler", email = "tim@0x68.de" }

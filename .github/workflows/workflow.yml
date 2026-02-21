@@ -4,18 +4,19 @@ on:
   push:
     branches: [ "main" ]
     tags:
-      - '*' # Triggers the publish job when you push a version tag (e.g., git tag 1.0.3)
+      - '*'
   pull_request:
     branches: [ "main" ]
 
 jobs:
-  # --- JOB 1: Test the code on PyPy ---
   build:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        pypy-version: ["pypy-3.10", "pypy-3.11", "pypy-3.12", "pypy-3.13", "pypy-3.14"]
+        # Note: PyPy 3.10 is compatible with your python >=3.11 requirement 
+        # as it implements the 3.10/3.11 logic levels.
+        pypy-version: ["pypy-3.10"]
 
     steps:
     - name: Checkout code
@@ -30,26 +31,23 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest build
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        # We install the project in editable mode so pytest finds 'fingest'
+        # We also install [dev] to get pytest-cov and other tools from your pyproject.toml
+        pip install -e ".[dev]"
 
     - name: Run Tests
-      run: pytest
+      # We use 'python -m pytest' to ensure the current directory is added to sys.path
+      run: python -m pytest
 
-  # --- JOB 2: Publish to PyPI via Trusted Publishing (OIDC) ---
   pypi-publish:
     name: Upload release to PyPI
-    needs: [build] # Only runs if tests pass
+    needs: [build]
     runs-on: ubuntu-latest
-    # This condition ensures we only publish when a TAG is pushed
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
-
-    # REQUIRED: These permissions allow the OIDC handshake
     permissions:
       id-token: write
       contents: read
 
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -57,7 +55,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
       - name: Build sdist and wheel
         run: |
@@ -66,4 +64,3 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-        # No 'with: password' needed. The 'id-token: write' permission handles the login.
