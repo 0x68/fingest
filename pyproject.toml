@@ -24,6 +24,7 @@ classifiers = [
 dependencies = [
   "pytest >=8.3.5, <9.0.0",
   "lxml >=5.4.0, <6.0.0",
+  "fastapi[standard]>=0.128.7",
 ]
 
 [project.entry-points.pytest11]
@@ -50,6 +51,10 @@ dev = [
   "flake8 >=7.0.0",
   "mypy >=1.8.0",
   "pre-commit >=3.6.0",
+]
+lint = [
+    "ruff>=0.15.2",
+    "ty>=0.0.18",
 ]
 
 # Black configuration
@@ -146,3 +151,8 @@ precision = 2
 
 [tool.coverage.html]
 directory = "htmlcov"
+
+[tool.uv.workspace]
+members = [
+    "fixture-manager/backend",
+]

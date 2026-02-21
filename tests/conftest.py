@@ -1,5 +1,6 @@
 from fingest.plugin import data_fixture
 from fingest.types import BaseFixture, JSONFixture, CSVFixture, XMLFixture
+from fingest import gcs_fixture
 
 
 @data_fixture("test.json", description="JSON File Foo Bar")
@@ -117,3 +118,8 @@ def function_with_complex_sig(data, required_dep, optional_dep="default", *args,
         "args": args,
         "kwargs": kwargs
     }
+
+
+@gcs_fixture(bucket="my-bucket", key="test.json")
+def gcs_bucket(data):
+    return data
