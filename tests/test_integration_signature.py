@@ -55,7 +55,7 @@ def test_function_fixture_data_access(function_with_deps):
     assert function_with_deps["data"]["Foo"] == "Bar"
     assert len(function_with_deps) > 0
 
-def test_error_handling_in_fixture_creation(self):
+def test_error_handling_in_fixture_creation():
     """Test that errors in fixture creation are handled properly."""
     # This test verifies that the error handling in create_fixture works
     # We can't easily test this without creating a fixture that fails,

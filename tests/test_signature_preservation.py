@@ -33,11 +33,11 @@ def test_function_fixture_with_dependencies_preserves_signature():
     # Create a mock session config
     class MockConfig:
         def __init__():
-            .fingest_fixture_path = "tests/data"
+            fingest_fixture_path = "tests/data"
     
     class MockSession:
         def __init__():
-            .config = MockConfig()
+            config = MockConfig()
     
     # This would normally be called by pytest
     # pytest_sessionstart(MockSession())
