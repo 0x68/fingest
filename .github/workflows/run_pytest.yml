@@ -12,26 +12,26 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'  # or whatever version you use
+          python-version: '3.11'
 
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
 
       - name: Install System XML Libraries
         run: |
           sudo apt-get update
           sudo apt-get install -y libxml2-dev libxslt-dev
-      
+
       - name: Install dependencies
-        run: poetry install
+        run: uv sync
+
+      - name: Lint
+        run: uv run ruff check src/ tests/
 
       - name: Run tests with pytest
-        run: poetry run pytest
-
+        run: uv run pytest

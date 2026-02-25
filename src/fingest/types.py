@@ -1,6 +1,7 @@
 """Type definitions and base classes for fingest fixtures."""
 
-from typing import Any, Callable, Dict, Iterator, List, Optional, Union
+from collections.abc import Callable, Iterator
+from typing import Any
 
 from lxml import etree
 
@@ -93,7 +94,7 @@ class BaseFixture:
 class JSONFixture(BaseFixture):
     """Fixture for JSON data with dictionary/list-specific methods."""
 
-    def __init__(self, data: Union[Dict, List], **kwargs: Any) -> None:
+    def __init__(self, data: dict | list, **kwargs: Any) -> None:
         """Initialize with JSON data.
 
         Args:
@@ -130,7 +131,7 @@ class JSONFixture(BaseFixture):
         """Get the length of the data."""
         return len(self._data)
 
-    def __getitem__(self, key: Union[str, int]) -> Any:
+    def __getitem__(self, key: str | int) -> Any:
         """Allow direct indexing of the data."""
         return self._data[key]
 
@@ -146,7 +147,7 @@ class JSONFixture(BaseFixture):
 class CSVFixture(BaseFixture):
     """Fixture for CSV data with row-specific methods."""
 
-    def __init__(self, data: List[Dict[str, str]], **kwargs: Any) -> None:
+    def __init__(self, data: list[dict[str, str]], **kwargs: Any) -> None:
         """Initialize with CSV data.
 
         Args:
@@ -156,7 +157,7 @@ class CSVFixture(BaseFixture):
         super().__init__(data, **kwargs)
 
     @property
-    def rows(self) -> List[Dict[str, str]]:
+    def rows(self) -> list[dict[str, str]]:
         """Get all rows."""
         return self._data
 
@@ -166,19 +167,19 @@ class CSVFixture(BaseFixture):
         return len(self._data)
 
     @property
-    def columns(self) -> List[str]:
+    def columns(self) -> list[str]:
         """Get column names."""
         if self._data:
             return list(self._data[0].keys())
         return []
 
-    def get_column(self, column_name: str) -> List[str]:
+    def get_column(self, column_name: str) -> list[str]:
         """Get all values from a specific column."""
         return [row.get(column_name, "") for row in self._data]
 
     def filter_rows(
-        self, **kwargs: Union[str, Callable[[str], bool]]
-    ) -> List[Dict[str, str]]:
+        self, **kwargs: str | Callable[[str], bool]
+    ) -> list[dict[str, str]]:
         """Filter rows based on column values or predicates.
 
         Each keyword argument can be either a literal string value for exact
@@ -206,11 +207,11 @@ class CSVFixture(BaseFixture):
                 filtered.append(row)
         return filtered
 
-    def __getitem__(self, index: int) -> Dict[str, str]:
+    def __getitem__(self, index: int) -> dict[str, str]:
         """Get a specific row by index."""
         return self._data[index]
 
-    def __iter__(self) -> Iterator[Dict[str, str]]:
+    def __iter__(self) -> Iterator[dict[str, str]]:
         """Iterate over rows."""
         return iter(self._data)
 
@@ -241,15 +242,15 @@ class XMLFixture(BaseFixture):
         """Get the root element's tag name."""
         return self.root.tag
 
-    def find(self, path: str) -> Optional[etree._Element]:
+    def find(self, path: str) -> etree._Element | None:
         """Find the first element matching the XPath."""
         return self.root.find(path)
 
-    def findall(self, path: str) -> List[etree._Element]:
+    def findall(self, path: str) -> list[etree._Element]:
         """Find all elements matching the XPath."""
         return self.root.findall(path)
 
-    def xpath(self, path: str) -> List[Any]:
+    def xpath(self, path: str) -> list[Any]:
         """Execute an XPath query."""
         return self.root.xpath(path)
 
@@ -258,15 +259,15 @@ class XMLFixture(BaseFixture):
         element = self.find(path)
         return element.text if element is not None and element.text else default
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Recursively convert the XML tree to a plain dictionary.
 
         Attributes are stored under an ``"@attr"`` key; text content under
         ``"#text"``.  Repeated child tags become lists automatically.
         """
 
-        def _element_to_dict(el: etree._Element) -> Dict[str, Any]:
-            result: Dict[str, Any] = {}
+        def _element_to_dict(el: etree._Element) -> dict[str, Any]:
+            result: dict[str, Any] = {}
 
             # Attributes
             for attr_name, attr_val in el.attrib.items():

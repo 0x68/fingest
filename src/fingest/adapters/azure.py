@@ -1,6 +1,7 @@
 """Azure Blob adapter and fixture decorator."""
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from fingest.adapters.base import CloudAdapter
 from fingest.plugin import data_fixture
@@ -17,7 +18,7 @@ class AzureBlobAdapter(CloudAdapter):
             raise ImportError(
                 "azure-storage-blob is required for live Azure loading. "
                 "Install it with: pip install azure-storage-blob"
-            )
+            ) from None
 
         # Assumes connection string is in environment or managed identity
         # This is a simplified implementation for the remote part

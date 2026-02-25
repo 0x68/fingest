@@ -144,7 +144,7 @@ class azure_config(XMLFixture): pass
 
 ### 2. Mocking vs. Live Mode
 
-The adapters are in **mock mode** by default. They will look for files in your local fixture directory (e.g., `tests/data/data/users.json`). 
+The adapters are in **mock mode** by default. They will look for files in your local fixture directory using the key as a relative path (e.g., `tests/data/data/users.json` for the examples above).
 
 To enable **live mode** (hitting the real cloud SDKs), set `mock=False`. Note that cloud SDKs (`boto3`, `google-cloud-storage`, `azure-storage-blob`) are optional dependencies and must be installed separately.
 
@@ -228,8 +228,8 @@ Register a custom data loader globally for a file extension (without dot).
 ```bash
 git clone https://github.com/0x68/fingest.git
 cd fingest
-poetry install
-poetry run pytest
+uv sync
+uv run pytest
 ```
 
 ## License

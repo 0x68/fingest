@@ -2,7 +2,7 @@
 
 import io
 from pathlib import Path
-from typing import Any, Optional, Protocol, Union, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -55,12 +55,15 @@ class CloudAdapter:
     def _load_local(self, path: Path) -> Any:
         """Load data from the local file system.
 
-        This is used for mocking cloud storage endpoints.
+        Reads the file and parses it through ``_parse_content`` – the same
+        method used by ``_load_remote`` – so mock mode produces output
+        identical to live mode.
         """
-        # We import here to avoid circular dependencies
-        from fingest.plugin import _load_data
+        if not path.exists():
+            raise FileNotFoundError(f"Data file not found: {path}")
 
-        return _load_data(path)
+        content = path.read_bytes()
+        return self._parse_content(content)
 
     def _load_remote(self) -> Any:
         """Load data from the actual cloud provider.
@@ -71,9 +74,7 @@ class CloudAdapter:
             "Remote loading not implemented for base CloudAdapter"
         )
 
-    def _parse_content(
-        self, content: Union[bytes, str], extension: Optional[str] = None
-    ) -> Any:
+    def _parse_content(self, content: bytes | str, extension: str | None = None) -> Any:
         """Parse raw content based on file extension.
 
         Args:
@@ -114,9 +115,10 @@ class CloudAdapter:
         elif extension == "xml":
             from lxml import etree
 
-            # etree can handle both bytes and str
             if isinstance(content, str):
-                return etree.fromstring(content.encode("utf-8"))
-            return etree.fromstring(content)
+                root = etree.fromstring(content.encode("utf-8"))
+            else:
+                root = etree.fromstring(content)
+            return etree.ElementTree(root)
 
         return content
