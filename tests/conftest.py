@@ -1,6 +1,8 @@
-from fingest.plugin import data_fixture
-from fingest.types import BaseFixture, JSONFixture, CSVFixture, XMLFixture
+import pytest
+
 from fingest import gcs_fixture
+from fingest.plugin import data_fixture
+from fingest.types import BaseFixture, CSVFixture, JSONFixture, XMLFixture
 
 
 @data_fixture("test.json", description="JSON File Foo Bar")
@@ -28,24 +30,28 @@ def json_test_file(data):
 @data_fixture("users.json", description="User data from JSON")
 class user_data(JSONFixture):
     """Test fixture for user data."""
+
     pass
 
 
 @data_fixture("products.csv", description="Product data from CSV")
 class product_data(CSVFixture):
     """Test fixture for product data."""
+
     pass
 
 
 @data_fixture("config.xml", description="Configuration from XML")
 class config_data(XMLFixture):
     """Test fixture for configuration data."""
+
     pass
 
 
 @data_fixture("test.json", description="Simple JSON test data")
 class simple_data(BaseFixture):
     """Test fixture using base class."""
+
     pass
 
 
@@ -63,7 +69,6 @@ def product_function_data(data):
 
 
 # Additional fixtures for testing signature preservation
-import pytest
 
 
 @pytest.fixture
@@ -92,7 +97,7 @@ def function_with_deps(data, mock_dependency, another_dependency):
         "data": data,
         "mock_dep": mock_dependency,
         "another_dep": another_dependency,
-        "combined": f"{mock_dependency}_{data.get('Foo', 'unknown')}"
+        "combined": f"{mock_dependency}_{data.get('Foo', 'unknown')}",
     }
 
 
@@ -100,23 +105,21 @@ def function_with_deps(data, mock_dependency, another_dependency):
 @data_fixture("test.json", description="Function fixture with optional dependencies")
 def function_with_optional_deps(data, mock_dependency, optional_param="default_value"):
     """Function fixture with optional parameters."""
-    return {
-        "data": data,
-        "mock_dep": mock_dependency,
-        "optional": optional_param
-    }
+    return {"data": data, "mock_dep": mock_dependency, "optional": optional_param}
 
 
 # Test function-based fixture with complex signature
 @data_fixture("test.json", description="Function fixture with complex signature")
-def function_with_complex_sig(data, required_dep, optional_dep="default", *args, **kwargs):
+def function_with_complex_sig(
+    data, required_dep, optional_dep="default", *args, **kwargs
+):
     """Function fixture with complex signature including *args and **kwargs."""
     return {
         "data": data,
         "required": required_dep,
         "optional": optional_dep,
         "args": args,
-        "kwargs": kwargs
+        "kwargs": kwargs,
     }
 
 

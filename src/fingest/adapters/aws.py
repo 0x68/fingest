@@ -1,6 +1,7 @@
 """AWS S3 adapter and fixture decorator."""
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from fingest.adapters.base import CloudAdapter
 from fingest.plugin import data_fixture
@@ -17,7 +18,7 @@ class S3Adapter(CloudAdapter):
             raise ImportError(
                 "boto3 is required for live S3 loading. "
                 "Install it with: pip install boto3"
-            )
+            ) from None
 
         s3 = boto3.client("s3")
         response = s3.get_object(Bucket=self.bucket, Key=self.key)
@@ -46,7 +47,6 @@ def aws_bucket_fixture(
     loader = S3Adapter(bucket, key, mock=mock)
 
     def decorator(obj: Any) -> Any:
-        # Use 'key' as path so fingest can resolve local file for mocking
         return data_fixture(file_path=key, description=description, loader=loader)(obj)
 
     return decorator

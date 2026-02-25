@@ -1,6 +1,7 @@
 """GCP GCS adapter and fixture decorator."""
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from fingest.adapters.base import CloudAdapter
 from fingest.plugin import data_fixture
@@ -17,7 +18,7 @@ class GCSAdapter(CloudAdapter):
             raise ImportError(
                 "google-cloud-storage is required for live GCS loading. "
                 "Install it with: pip install google-cloud-storage"
-            )
+            ) from None
 
         client = storage.Client()
         bucket = client.bucket(self.bucket)

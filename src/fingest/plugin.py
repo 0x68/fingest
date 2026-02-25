@@ -4,14 +4,15 @@ import csv
 import inspect
 import json
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 import pytest
 from lxml import etree
 
 # Global registry for data fixtures
-_fixture_registry: Dict[str, Dict[str, Any]] = {}
+_fixture_registry: dict[str, dict[str, Any]] = {}
 
 # Logger for the plugin
 logger = logging.getLogger(__name__)
@@ -21,7 +22,7 @@ class DataLoaderRegistry:
     """Registry for data loaders by file extension."""
 
     def __init__(self) -> None:
-        self._loaders: Dict[str, Callable[[Path], Any]] = {}
+        self._loaders: dict[str, Callable[[Path], Any]] = {}
         self._register_default_loaders()
 
     def _register_default_loaders(self) -> None:
@@ -45,7 +46,7 @@ class DataLoaderRegistry:
         exts = ", ".join(sorted(self._loaders.keys()))
         return f"DataLoaderRegistry(loaders=[{exts}])"
 
-    def get_loader(self, extension: str) -> Optional[Callable[[Path], Any]]:
+    def get_loader(self, extension: str) -> Callable[[Path], Any] | None:
         """Get a loader for a file extension.
 
         Args:
@@ -90,7 +91,7 @@ class DataLoaderRegistry:
     def _load_json(path: Path) -> Any:
         """Load JSON data from file."""
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 return json.load(f)
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in file {path}: {e}") from e
@@ -136,7 +137,7 @@ def pytest_configure(config: Any) -> None:
 def data_fixture(
     file_path: str,
     description: str = "",
-    loader: Optional[Callable[[Path], Any]] = None,
+    loader: Callable[[Path], Any] | None = None,
 ) -> Callable:
     """Decorator to register a class or function as a data-backed fixture.
 
@@ -208,7 +209,7 @@ def _load_data(path: Path) -> Any:
 
 def _resolve_data(
     path: Path,
-    custom_loader: Optional[Callable[[Path], Any]],
+    custom_loader: Callable[[Path], Any] | None,
 ) -> Any:
     """Load data using custom loader if provided, otherwise the default registry."""
     if custom_loader:
@@ -221,7 +222,7 @@ def _build_class_fixture(
     obj: type,
     path: Path,
     description: str,
-    custom_loader: Optional[Callable[[Path], Any]],
+    custom_loader: Callable[[Path], Any] | None,
 ) -> Callable:
     """Internal helper to build a class-based pytest fixture."""
 
@@ -234,7 +235,7 @@ def _build_class_fixture(
             raise FileNotFoundError(
                 f"Fixture '{name}': data file not found at '{path}'. "
                 f"Check that fingest_fixture_path is set correctly in pytest.ini."
-            )
+            ) from None
         except Exception as e:
             logger.error(f"Fixture '{name}' failed (file: {path}): {e}")
             raise
@@ -247,17 +248,14 @@ def _build_func_fixture(
     obj: Callable,
     path: Path,
     description: str,
-    custom_loader: Optional[Callable[[Path], Any]],
+    custom_loader: Callable[[Path], Any] | None,
 ) -> Callable:
     """Internal helper to build a function-based pytest fixture."""
     sig = inspect.signature(obj)
     params = list(sig.parameters.values())
 
     # Strip the leading `data` / `self` parameter that fingest injects.
-    if params and params[0].name in ("data", "self"):
-        new_params = params[1:]
-    else:
-        new_params = params
+    new_params = params[1:] if params and params[0].name in ("data", "self") else params
 
     new_sig = sig.replace(parameters=new_params)
 
@@ -273,7 +271,7 @@ def _build_func_fixture(
             raise FileNotFoundError(
                 f"Fixture '{name}': data file not found at '{path}'. "
                 f"Check that fingest_fixture_path is set correctly in pytest.ini."
-            )
+            ) from None
         except Exception as e:
             logger.error(f"Fixture '{name}' failed (file: {path}): {e}")
             raise
@@ -292,7 +290,7 @@ def _build_pytest_fixture(
     obj: Any,
     path: Path,
     description: str,
-    custom_loader: Optional[Callable[[Path], Any]] = None,
+    custom_loader: Callable[[Path], Any] | None = None,
 ) -> Callable:
     """Build a pytest fixture from a registered data fixture definition."""
 

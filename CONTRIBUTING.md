@@ -30,7 +30,7 @@ Thank you for your interest in contributing to Fingest! This document provides g
 ### Prerequisites
 
 - Python 3.11 or higher
-- Poetry (for dependency management)
+- [uv](https://docs.astral.sh/uv/) (for dependency management)
 - Git
 
 ### Installation
@@ -41,10 +41,10 @@ git clone https://github.com/0x68/fingest.git
 cd fingest
 
 # Install dependencies and development tools
-make dev-install
+uv sync
 
 # Verify installation
-make test
+uv run pytest
 ```
 
 ### Development Workflow
@@ -67,21 +67,21 @@ make test-cov
 
 We use several tools to maintain code quality:
 
-- **Black**: Code formatting
-- **isort**: Import sorting
-- **flake8**: Linting
+- **Ruff**: Linting and code formatting (replaces black, isort, flake8)
 - **mypy**: Type checking
 - **pre-commit**: Git hooks for quality checks
 
-### Formatting
+### Formatting & Linting
 
 ```bash
 # Format all code
-make format
+uv run ruff format src tests
 
 # Check formatting without changing files
-poetry run black --check src tests
-poetry run isort --check-only src tests
+uv run ruff format --check src tests
+
+# Lint
+uv run ruff check src tests
 ```
 
 ### Type Hints
@@ -102,7 +102,7 @@ make test
 make test-cov
 
 # Run specific test file
-poetry run pytest tests/test_plugin.py
+uv run pytest tests/test_plugin.py
 
 # Run with verbose output
 make test-verbose

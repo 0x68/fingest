@@ -1,6 +1,6 @@
 [project]
 name = "fingest"
-version = "1.0.4"
+version = "1.1.0"
 description = "Pytest plugin that allows you to easily define data-driven fixtures based on external files."
 authors = [
     { name = "Tim Fiedler", email = "tim@0x68.de" }
@@ -45,44 +45,27 @@ packages = ["src/fingest"]
 [dependency-groups]
 dev = [
   "pytest-cov >=6.2.1, <7.0.0",
-  "black >=24.0.0",
-  "isort >=5.13.0",
-  "flake8 >=7.0.0",
+  "ruff >=0.15.2",
+  "ty >=0.0.18",
   "mypy >=1.8.0",
   "pre-commit >=3.6.0",
 ]
 
-lint = [
-    "ruff>=0.15.2",
-    "ty>=0.0.18",
-]
-
-# Black configuration
-[tool.black]
+[tool.ruff]
 line-length = 88
-target-version = ['py311']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-)/
-'''
+target-version = "py311"
 
-# isort configuration
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-line_length = 88
-known_first_party = ["fingest"]
-known_third_party = ["pytest", "lxml"]
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = ["E203", "E501", "SIM108", "SIM117"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["fingest"]
+known-third-party = ["pytest", "lxml"]
 
 # mypy configuration
 [tool.mypy]
