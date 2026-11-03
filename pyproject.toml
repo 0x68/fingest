@@ -1,14 +1,15 @@
 [project]
 name = "fingest"
-version = "1.1.0"
-description = "Pytest plugin that allows you to easily define data-driven fixtures based on external files."
-authors = [
-    { name = "Tim Fiedler", email = "tim@0x68.de" }
-]
+version = "2.0.0"
+description = "Pytest plugin for data-driven fixtures and local simulation of AWS S3, Google Cloud Storage and Azure Blob Storage."
+authors = [{ name = "Tim Fiedler", email = "tim@0x68.de" }]
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
-keywords = ["pytest", "plugin", "fixtures", "data-driven", "testing", "json", "csv", "xml"]
+keywords = [
+  "pytest", "plugin", "fixtures", "data-driven", "testing", "mock",
+  "s3", "gcs", "azure-blob", "boto3", "json", "csv", "xml",
+]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Framework :: Pytest",
@@ -17,14 +18,22 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "License :: OSI Approved :: MIT License",
   "Topic :: Software Development :: Testing",
-  "Topic :: Software Development :: Libraries :: Python Modules"
+  "Topic :: Software Development :: Testing :: Mocking",
+  "Typing :: Typed",
 ]
 dependencies = [
-  "pytest >=8.3.5, <9.0.0",
-  "lxml >=5.4.0, <6.0.0",
+  "pytest>=8.0",
+  "lxml>=5.4",
 ]
+
+[project.optional-dependencies]
+aws = ["boto3>=1.34"]
+gcp = ["google-cloud-storage>=2.10"]
+azure = ["azure-storage-blob>=12.19"]
+all = ["fingest[aws,gcp,azure]"]
 
 [project.entry-points.pytest11]
 fingest = "fingest.plugin"
@@ -44,93 +53,57 @@ packages = ["src/fingest"]
 
 [dependency-groups]
 dev = [
-  "pytest-cov >=6.2.1, <7.0.0",
-  "ruff >=0.15.2",
-  "ty >=0.0.18",
-  "mypy >=1.8.0",
-  "pre-commit >=3.6.0",
+  "pytest-cov>=6.0",
+  "ruff>=0.15",
+  "mypy>=1.13",
+  "pre-commit>=4.0",
+  "boto3>=1.34",
+  "google-cloud-storage>=2.10",
+  "azure-storage-blob>=12.19",
+  "lxml-stubs>=0.5.1",
 ]
 
 [tool.ruff]
 line-length = 88
 target-version = "py311"
+src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "SIM"]
-ignore = ["E203", "E501", "SIM108", "SIM117"]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "PT"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["E501"]
-"__init__.py" = ["F401"]
+"tests/**" = ["PT011", "PT018"]
+"src/fingest/cloud/__init__.py" = ["F401"]  # lazy re-exports for type checkers
 
-[tool.ruff.lint.isort]
-known-first-party = ["fingest"]
-known-third-party = ["pytest", "lxml"]
-
-# mypy configuration
 [tool.mypy]
 python_version = "3.11"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-disallow_untyped_decorators = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_no_return = true
-warn_unreachable = true
-strict_equality = true
+strict = true
+files = ["src/fingest"]
 
 [[tool.mypy.overrides]]
-module = "tests.*"
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
+# Optional cloud SDKs ship without (complete) type information.
+module = ["boto3.*", "botocore.*", "google.*", "azure.*"]
+ignore_missing_imports = true
 
-# pytest configuration
+[[tool.mypy.overrides]]
+# google.api_core exception constructors are unannotated.
+module = ["fingest.cloud.gcs"]
+disallow_untyped_calls = false
+
 [tool.pytest.ini_options]
 minversion = "8.0"
-addopts = [
-    "--strict-markers",
-    "--strict-config",
-    "--verbose",
-]
+addopts = ["-p", "pytester", "--strict-markers", "--strict-config"]
 testpaths = ["tests"]
-filterwarnings = [
-    "error",
-    "ignore::UserWarning",
-    "ignore::DeprecationWarning",
-]
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks tests as integration tests",
-]
+fingest_fixture_path = "tests/data"
+fingest_s3_root = "tests/data/s3"
+fingest_gcs_root = "tests/data/gcs"
+fingest_azure_root = "tests/data/azure"
+filterwarnings = ["error", "ignore::DeprecationWarning"]
 
-# Coverage configuration
 [tool.coverage.run]
-source = ["src"]
+source = ["fingest"]
 branch = true
-omit = [
-    "*/tests/*",
-    "*/test_*",
-]
 
 [tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "if self.debug:",
-    "if settings.DEBUG",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if 0:",
-    "if __name__ == .__main__.:",
-    "class .*\\bProtocol\\):",
-    "@(abc\\.)?abstractmethod",
-]
 show_missing = true
-precision = 2
-
-[tool.coverage.html]
-directory = "htmlcov"
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]
