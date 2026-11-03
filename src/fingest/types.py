@@ -1,6 +1,9 @@
 """Type definitions and base classes for fingest fixtures."""
 
-from typing import Any, Callable, Dict, Iterator, List, Optional, Union
+from __future__ import annotations
+
+from collections.abc import Callable, ItemsView, Iterator, KeysView, ValuesView
+from typing import Any
 
 from lxml import etree
 
@@ -52,7 +55,7 @@ class BaseFixture:
         except TypeError:
             return bool(self._data)
 
-    def __iter__(self) -> Iterator:
+    def __iter__(self) -> Iterator[Any]:
         """Iterate over the underlying data."""
         return iter(self._data)
 
@@ -93,7 +96,7 @@ class BaseFixture:
 class JSONFixture(BaseFixture):
     """Fixture for JSON data with dictionary/list-specific methods."""
 
-    def __init__(self, data: Union[Dict, List], **kwargs: Any) -> None:
+    def __init__(self, data: dict[str, Any] | list[Any], **kwargs: Any) -> None:
         """Initialize with JSON data.
 
         Args:
@@ -102,19 +105,19 @@ class JSONFixture(BaseFixture):
         """
         super().__init__(data, **kwargs)
 
-    def keys(self):
+    def keys(self) -> KeysView[Any]:
         """Get keys if data is a dictionary."""
         if isinstance(self._data, dict):
             return self._data.keys()
         raise TypeError(_NOT_DICT_ERROR)
 
-    def values(self):
+    def values(self) -> ValuesView[Any]:
         """Get values if data is a dictionary."""
         if isinstance(self._data, dict):
             return self._data.values()
         raise TypeError(_NOT_DICT_ERROR)
 
-    def items(self):
+    def items(self) -> ItemsView[Any, Any]:
         """Get items if data is a dictionary."""
         if isinstance(self._data, dict):
             return self._data.items()
@@ -130,23 +133,17 @@ class JSONFixture(BaseFixture):
         """Get the length of the data."""
         return len(self._data)
 
-    def __getitem__(self, key: Union[str, int]) -> Any:
+    def __getitem__(self, key: str | int) -> Any:
         """Allow direct indexing of the data."""
         return self._data[key]
-
-    def __iter__(self) -> Iterator:
-        """Iterate over keys (dict) or items (list)."""
-        return iter(self._data)
-
-    def __contains__(self, item: Any) -> bool:
-        """Check containment — keys for dicts, items for lists."""
-        return item in self._data
 
 
 class CSVFixture(BaseFixture):
     """Fixture for CSV data with row-specific methods."""
 
-    def __init__(self, data: List[Dict[str, str]], **kwargs: Any) -> None:
+    _data: list[dict[str, str]]
+
+    def __init__(self, data: list[dict[str, str]], **kwargs: Any) -> None:
         """Initialize with CSV data.
 
         Args:
@@ -156,7 +153,7 @@ class CSVFixture(BaseFixture):
         super().__init__(data, **kwargs)
 
     @property
-    def rows(self) -> List[Dict[str, str]]:
+    def rows(self) -> list[dict[str, str]]:
         """Get all rows."""
         return self._data
 
@@ -166,19 +163,19 @@ class CSVFixture(BaseFixture):
         return len(self._data)
 
     @property
-    def columns(self) -> List[str]:
+    def columns(self) -> list[str]:
         """Get column names."""
         if self._data:
             return list(self._data[0].keys())
         return []
 
-    def get_column(self, column_name: str) -> List[str]:
+    def get_column(self, column_name: str) -> list[str]:
         """Get all values from a specific column."""
         return [row.get(column_name, "") for row in self._data]
 
     def filter_rows(
-        self, **kwargs: Union[str, Callable[[str], bool]]
-    ) -> List[Dict[str, str]]:
+        self, **kwargs: str | Callable[[str | None], bool]
+    ) -> list[dict[str, str]]:
         """Filter rows based on column values or predicates.
 
         Each keyword argument can be either a literal string value for exact
@@ -189,28 +186,22 @@ class CSVFixture(BaseFixture):
             fixture.filter_rows(city="NYC")
             fixture.filter_rows(price=lambda p: float(p) > 100)
         """
-        filtered = []
-        for row in self._data:
-            match = True
-            for key, value in kwargs.items():
-                cell = row.get(key)
-                if callable(value):
-                    if not value(cell):
-                        match = False
-                        break
-                else:
-                    if cell != str(value):
-                        match = False
-                        break
-            if match:
-                filtered.append(row)
-        return filtered
 
-    def __getitem__(self, index: int) -> Dict[str, str]:
+        def matches(row: dict[str, str]) -> bool:
+            for column, expected in kwargs.items():
+                cell = row.get(column)
+                ok = expected(cell) if callable(expected) else cell == str(expected)
+                if not ok:
+                    return False
+            return True
+
+        return [row for row in self._data if matches(row)]
+
+    def __getitem__(self, index: int) -> dict[str, str]:
         """Get a specific row by index."""
         return self._data[index]
 
-    def __iter__(self) -> Iterator[Dict[str, str]]:
+    def __iter__(self) -> Iterator[dict[str, str]]:
         """Iterate over rows."""
         return iter(self._data)
 
@@ -221,6 +212,8 @@ class CSVFixture(BaseFixture):
 
 class XMLFixture(BaseFixture):
     """Fixture for XML data with XML-specific methods."""
+
+    _data: etree._ElementTree
 
     def __init__(self, data: etree._ElementTree, **kwargs: Any) -> None:
         """Initialize with XML data.
@@ -241,16 +234,16 @@ class XMLFixture(BaseFixture):
         """Get the root element's tag name."""
         return self.root.tag
 
-    def find(self, path: str) -> Optional[etree._Element]:
+    def find(self, path: str) -> etree._Element | None:
         """Find the first element matching the XPath."""
         return self.root.find(path)
 
-    def findall(self, path: str) -> List[etree._Element]:
+    def findall(self, path: str) -> list[etree._Element]:
         """Find all elements matching the XPath."""
         return self.root.findall(path)
 
-    def xpath(self, path: str) -> List[Any]:
-        """Execute an XPath query."""
+    def xpath(self, path: str) -> Any:
+        """Execute an XPath query (a list of nodes, or a scalar for e.g. count())."""
         return self.root.xpath(path)
 
     def get_text(self, path: str, default: str = "") -> str:
@@ -258,19 +251,23 @@ class XMLFixture(BaseFixture):
         element = self.find(path)
         return element.text if element is not None and element.text else default
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Recursively convert the XML tree to a plain dictionary.
 
         Attributes are stored under an ``"@attr"`` key; text content under
         ``"#text"``.  Repeated child tags become lists automatically.
         """
 
-        def _element_to_dict(el: etree._Element) -> Dict[str, Any]:
-            result: Dict[str, Any] = {}
+        def _element_to_dict(el: etree._Element) -> dict[str, Any]:
+            result: dict[str, Any] = {}
 
             # Attributes
             for attr_name, attr_val in el.attrib.items():
-                result[f"@{attr_name}"] = attr_val
+                result[
+                    "@" + str(attr_name, "utf-8")
+                    if isinstance(attr_name, bytes)
+                    else "@" + attr_name
+                ] = attr_val
 
             # Children
             for child in el:

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <database>
+        <host>localhost</host>
+        <port>5432</port>
+        <name>testdb</name>
+        <user>testuser</user>
+    </database>
+    <features>
+        <feature name="logging" enabled="true"/>
+        <feature name="caching" enabled="false"/>
+        <feature name="monitoring" enabled="true"/>
+    </features>
+    <settings>
+        <timeout>30</timeout>
+        <retries>3</retries>
+        <debug>false</debug>
+    </settings>
+</configuration>

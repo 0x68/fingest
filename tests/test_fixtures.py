@@ -1,58 +1,61 @@
-import pytest
-from pathlib import Path
-
-
-def test_user_data_basic( user_data):
+def test_user_data_basic(user_data):
     """Test basic user data access."""
     assert user_data is not None
     assert len(user_data) == 3
     assert user_data.length() == 3
 
-def test_user_data_keys( user_data):
+
+def test_user_data_keys(user_data):
     """Test accessing JSON keys."""
     # user_data contains a list, so we test the first item
     first_user = user_data[0]
     expected_keys = {"id", "name", "email", "age", "active"}
     assert set(first_user.keys()) == expected_keys
 
-def test_user_data_indexing( user_data):
+
+def test_user_data_indexing(user_data):
     """Test indexing into user data."""
     first_user = user_data[0]
     assert first_user["name"] == "John Doe"
     assert first_user["age"] == 30
     assert first_user["active"] is True
 
-def test_simple_data_get( simple_data):
+
+def test_simple_data_get(simple_data):
     """Test get method on simple JSON data."""
     # simple_data uses test.json which contains {"Foo": "Bar"}
     assert simple_data.data.get("Foo") == "Bar"
     assert simple_data.data.get("NonExistent", "default") == "default"
 
-def test_user_function_data( user_function_data):
+
+def test_user_function_data(user_function_data):
     """Test function-based JSON fixture."""
     assert isinstance(user_function_data, list)
     assert len(user_function_data) == 3
     assert user_function_data[0]["name"] == "John Doe"
 
 
-def test_product_data_basic( product_data):
+def test_product_data_basic(product_data):
     """Test basic product data access."""
     assert product_data is not None
     assert len(product_data) == 5
     assert len(product_data.rows) == 5
 
-def test_product_data_columns( product_data):
+
+def test_product_data_columns(product_data):
     """Test CSV column access."""
     expected_columns = ["id", "name", "price", "category", "in_stock"]
     assert product_data.columns == expected_columns
 
-def test_product_data_column_values( product_data):
+
+def test_product_data_column_values(product_data):
     """Test getting column values."""
     names = product_data.get_column("name")
     expected_names = ["Laptop", "Mouse", "Keyboard", "Desk", "Chair"]
     assert names == expected_names
 
-def test_product_data_filtering( product_data):
+
+def test_product_data_filtering(product_data):
     """Test filtering CSV data."""
     electronics = product_data.filter_rows(category="Electronics")
     assert len(electronics) == 3
@@ -60,13 +63,15 @@ def test_product_data_filtering( product_data):
     in_stock = product_data.filter_rows(in_stock="true")
     assert len(in_stock) == 4
 
-def test_product_data_indexing( product_data):
+
+def test_product_data_indexing(product_data):
     """Test indexing into CSV data."""
     first_product = product_data[0]
     assert first_product["name"] == "Laptop"
     assert first_product["price"] == "999.99"
 
-def test_product_function_data( product_function_data):
+
+def test_product_function_data(product_function_data):
     """Test function-based CSV fixture."""
     assert isinstance(product_function_data, list)
     assert len(product_function_data) == 5
@@ -76,11 +81,13 @@ def test_product_function_data( product_function_data):
 class TestXMLFixtures:
     """Test XML-based fixtures."""
 
+
 def test_config_data_basic(config_data):
     """Test basic XML data access."""
     assert config_data is not None
     assert config_data.root is not None
     assert config_data.root.tag == "configuration"
+
 
 def test_config_data_find(config_data):
     """Test finding XML elements."""
@@ -92,6 +99,7 @@ def test_config_data_find(config_data):
     assert port is not None
     assert port.text == "5432"
 
+
 def test_config_data_findall(config_data):
     """Test finding all matching XML elements."""
     features = config_data.findall("features/feature")
@@ -102,6 +110,7 @@ def test_config_data_findall(config_data):
     expected_names = ["logging", "caching", "monitoring"]
     assert feature_names == expected_names
 
+
 def test_config_data_get_text(config_data):
     """Test getting text content from XML."""
     timeout = config_data.get_text("settings/timeout")
@@ -110,6 +119,7 @@ def test_config_data_get_text(config_data):
     # Test default value
     missing = config_data.get_text("settings/missing", "default")
     assert missing == "default"
+
 
 def test_config_data_xpath(config_data):
     """Test XPath queries."""
@@ -121,27 +131,31 @@ def test_config_data_xpath(config_data):
     assert "logging" in enabled_names
     assert "monitoring" in enabled_names
 
+
 def test_fixture_description(user_data):
     """Test that fixture contains description."""
-    assert hasattr(user_data, 'description')
+    assert hasattr(user_data, "description")
     assert user_data.description == "User data from JSON"
 
-def test_fixture_str( user_data):
+
+def test_fixture_str(user_data):
     """Test string representation of fixture."""
     str_repr = str(user_data)
     assert "User data from JSON" in str_repr
 
 
-def test_base_fixture_bool( simple_data):
+def test_base_fixture_bool(simple_data):
     """Test boolean evaluation of fixtures."""
     assert bool(simple_data) is True
 
-def test_base_fixture_len( simple_data):
+
+def test_base_fixture_len(simple_data):
     """Test length of fixtures."""
     # simple_data contains {"Foo": "Bar"}, so length should be 1
     assert len(simple_data) == 1
 
-def test_base_fixture_repr( simple_data):
+
+def test_base_fixture_repr(simple_data):
     """Test string representation of fixtures."""
     repr_str = repr(simple_data)
     assert "Simple JSON test data" in repr_str

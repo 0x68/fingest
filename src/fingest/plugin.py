@@ -1,317 +1,124 @@
-"""Fingest pytest plugin for data-driven fixtures."""
+"""pytest entry point: ini options, CLI flags and the cloud storage fixtures."""
 
-import csv
-import inspect
-import json
-import logging
-from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from __future__ import annotations
+
+from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 import pytest
-from lxml import etree
 
-# Global registry for data fixtures
-_fixture_registry: Dict[str, Dict[str, Any]] = {}
+from fingest._config import (
+    FIXTURE_PATH_INI,
+    LIVE_OPTION,
+    PROVIDER_ROOT_INI,
+    live_mode,
+    provider_root,
+)
+from fingest.cloud.store import ObjectStore
 
-# Logger for the plugin
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:  # the fakes are imported lazily, only when a fixture is used
+    from fingest.cloud.azure import FakeAzureBlob
+    from fingest.cloud.base import FakeCloud
+    from fingest.cloud.gcs import FakeGCS
+    from fingest.cloud.s3 import FakeS3
 
+_AWS_TEST_ENV = {
+    "AWS_ACCESS_KEY_ID": "fingest",
+    "AWS_SECRET_ACCESS_KEY": "fingest",
+    "AWS_DEFAULT_REGION": "us-east-1",
+    "AWS_EC2_METADATA_DISABLED": "true",
+}
 
-class DataLoaderRegistry:
-    """Registry for data loaders by file extension."""
-
-    def __init__(self) -> None:
-        self._loaders: Dict[str, Callable[[Path], Any]] = {}
-        self._register_default_loaders()
-
-    def _register_default_loaders(self) -> None:
-        """Register default loaders for common file types."""
-        self.register("json", self._load_json)
-        self.register("csv", self._load_csv)
-        self.register("xml", self._load_xml)
-
-    def register(self, extension: str, loader: Callable[[Path], Any]) -> None:
-        """Register a loader for a file extension.
-
-        Args:
-            extension: File extension (without dot).
-            loader: Function that takes a Path and returns loaded data.
-        """
-        self._loaders[extension.lower()] = loader
-        logger.debug(f"Registered loader for .{extension} files")
-
-    def __repr__(self) -> str:
-        """Return a debug-friendly representation."""
-        exts = ", ".join(sorted(self._loaders.keys()))
-        return f"DataLoaderRegistry(loaders=[{exts}])"
-
-    def get_loader(self, extension: str) -> Optional[Callable[[Path], Any]]:
-        """Get a loader for a file extension.
-
-        Args:
-            extension: File extension (without dot).
-
-        Returns:
-            Loader function or None if not found.
-        """
-        return self._loaders.get(extension.lower())
-
-    def load_data(self, path: Path) -> Any:
-        """Load data from a file using the appropriate loader.
-
-        Args:
-            path: Path to the data file.
-
-        Returns:
-            Loaded data.
-
-        Raises:
-            FileNotFoundError: If the file doesn't exist.
-            ValueError: If the file format is unsupported or data is invalid.
-        """
-        if not path.exists():
-            raise FileNotFoundError(f"Data file not found: {path}")
-
-        if not path.is_file():
-            raise ValueError(f"Path is not a file: {path}")
-
-        extension = path.suffix[1:].lower()
-        loader = self.get_loader(extension)
-
-        if not loader:
-            raise ValueError(f"Unsupported file format: {extension}")
-
-        try:
-            return loader(path)
-        except Exception as e:
-            raise ValueError(f"Failed to load {path}: {e}") from e
-
-    @staticmethod
-    def _load_json(path: Path) -> Any:
-        """Load JSON data from file."""
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in file {path}: {e}") from e
-        except UnicodeDecodeError as e:
-            raise ValueError(f"Cannot decode JSON file {path}: {e}") from e
-
-    @staticmethod
-    def _load_csv(path: Path) -> Any:
-        """Load CSV data from file."""
-        try:
-            with open(path, newline="", encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                return list(reader)
-        except UnicodeDecodeError as e:
-            raise ValueError(f"Cannot decode CSV file {path}: {e}") from e
-
-    @staticmethod
-    def _load_xml(path: Path) -> Any:
-        """Load XML data from file."""
-        try:
-            return etree.parse(str(path))
-        except etree.XMLSyntaxError as e:
-            raise ValueError(f"Invalid XML in file {path}: {e}") from e
+_SEED_CACHE = pytest.StashKey[dict[str, ObjectStore]]()
 
 
-# Global data loader registry
-_data_loader_registry = DataLoaderRegistry()
-
-
-def pytest_addoption(parser: Any) -> None:
+def pytest_addoption(parser: pytest.Parser) -> None:
+    group = parser.getgroup("fingest", "fingest data fixtures and cloud storage fakes")
+    group.addoption(
+        "--fingest-live",
+        action="store_true",
+        dest=LIVE_OPTION,
+        default=False,
+        help="cloud fixtures without an explicit mock= read from the real services",
+    )
     parser.addini(
-        name="fingest_fixture_path",
-        help="Base path for fixture data files",
+        FIXTURE_PATH_INI,
+        help="base directory of @data_fixture files, relative to the rootdir",
         default="data",
     )
-
-
-def pytest_configure(config: Any) -> None:
-    data_path = config.getini("fingest_fixture_path")
-    config.fingest_fixture_path = data_path
-
-
-def data_fixture(
-    file_path: str,
-    description: str = "",
-    loader: Optional[Callable[[Path], Any]] = None,
-) -> Callable:
-    """Decorator to register a class or function as a data-backed fixture.
-
-    Args:
-        file_path: Path to the data file (relative to fingest_fixture_path).
-        description: Optional description for debugging and documentation.
-        loader: Optional custom data loader function.
-
-    Returns:
-        The decorated class or function.
-
-    Example:
-        @data_fixture("users.json", description="Test user data")
-        class UserData(JSONFixture):
-            pass
-
-        @data_fixture("config.yaml", loader=custom_yaml_loader)
-        def config_data(data):
-            return data
-    """
-
-    def wrapper(obj: Any) -> Any:
-        _fixture_registry[obj.__name__] = {
-            "obj": obj,
-            "path": Path(file_path),
-            "description": description,
-            "is_class": isinstance(obj, type),
-            "loader": loader,
-        }
-        logger.debug(f"Registered data fixture: {obj.__name__} -> {file_path}")
-        return obj
-
-    return wrapper
-
-
-def register_loader(extension: str, loader: Callable[[Path], Any]) -> None:
-    """Register a custom data loader for a file extension.
-
-    Args:
-        extension: File extension (without dot).
-        loader: Function that takes a Path and returns loaded data.
-
-    Example:
-        def yaml_loader(path):
-            import yaml
-            with open(path) as f:
-                return yaml.safe_load(f)
-
-        register_loader("yaml", yaml_loader)
-    """
-    _data_loader_registry.register(extension, loader)
-
-
-def _load_data(path: Path) -> Any:
-    """Load data from a file using the global data loader registry.
-
-    Args:
-        path: Path to the data file.
-
-    Returns:
-        Loaded data.
-
-    Raises:
-        FileNotFoundError: If the file doesn't exist.
-        ValueError: If the file format is unsupported or data is invalid.
-    """
-    return _data_loader_registry.load_data(path)
-
-
-def _resolve_data(
-    path: Path,
-    custom_loader: Optional[Callable[[Path], Any]],
-) -> Any:
-    """Load data using custom loader if provided, otherwise the default registry."""
-    if custom_loader:
-        return custom_loader(path)
-    return _load_data(path)
-
-
-def _build_class_fixture(
-    name: str,
-    obj: type,
-    path: Path,
-    description: str,
-    custom_loader: Optional[Callable[[Path], Any]],
-) -> Callable:
-    """Internal helper to build a class-based pytest fixture."""
-
-    @pytest.fixture(name=name)
-    def _class_fixture() -> Any:
-        try:
-            data = _resolve_data(path, custom_loader)
-            return obj(data, description=description)
-        except FileNotFoundError:
-            raise FileNotFoundError(
-                f"Fixture '{name}': data file not found at '{path}'. "
-                f"Check that fingest_fixture_path is set correctly in pytest.ini."
-            )
-        except Exception as e:
-            logger.error(f"Fixture '{name}' failed (file: {path}): {e}")
-            raise
-
-    return _class_fixture
-
-
-def _build_func_fixture(
-    name: str,
-    obj: Callable,
-    path: Path,
-    description: str,
-    custom_loader: Optional[Callable[[Path], Any]],
-) -> Callable:
-    """Internal helper to build a function-based pytest fixture."""
-    sig = inspect.signature(obj)
-    params = list(sig.parameters.values())
-
-    # Strip the leading `data` / `self` parameter that fingest injects.
-    if params and params[0].name in ("data", "self"):
-        new_params = params[1:]
-    else:
-        new_params = params
-
-    new_sig = sig.replace(parameters=new_params)
-
-    def _wrapper(*args: Any, **kwargs: Any) -> Any:
-        try:
-            data = _resolve_data(path, custom_loader)
-            result = obj(data, *args, **kwargs)
-            # Attach description to the result when possible.
-            if hasattr(result, "_description"):
-                result._description = description
-            return result
-        except FileNotFoundError:
-            raise FileNotFoundError(
-                f"Fixture '{name}': data file not found at '{path}'. "
-                f"Check that fingest_fixture_path is set correctly in pytest.ini."
-            )
-        except Exception as e:
-            logger.error(f"Fixture '{name}' failed (file: {path}): {e}")
-            raise
-
-    # Patch the wrapper so pytest sees the correct dependency signature.
-    _wrapper.__signature__ = new_sig
-    _wrapper.__name__ = obj.__name__
-    _wrapper.__doc__ = obj.__doc__
-    _wrapper.__module__ = obj.__module__
-
-    return pytest.fixture(name=name)(_wrapper)
-
-
-def _build_pytest_fixture(
-    name: str,
-    obj: Any,
-    path: Path,
-    description: str,
-    custom_loader: Optional[Callable[[Path], Any]] = None,
-) -> Callable:
-    """Build a pytest fixture from a registered data fixture definition."""
-
-    if isinstance(obj, type):
-        return _build_class_fixture(name, obj, path, description, custom_loader)
-
-    return _build_func_fixture(name, obj, path, description, custom_loader)
-
-
-def pytest_sessionstart(session: Any) -> None:
-    """Generate real pytest fixtures at test session start."""
-    data_root = getattr(session.config, "fingest_fixture_path", "data")
-
-    for name, info in _fixture_registry.items():
-        fixture_func = _build_pytest_fixture(
-            name=name,
-            obj=info["obj"],
-            path=Path(data_root) / info["path"],
-            description=info["description"],
-            custom_loader=info.get("loader"),
+    for provider, ini in PROVIDER_ROOT_INI.items():
+        parser.addini(
+            ini,
+            help=f"seed directory for the simulated {provider} storage "
+            f"(<bucket>/<key> layout); default: <{FIXTURE_PATH_INI}>/{provider}",
+            default="",
         )
-        globals()[name] = fixture_func
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.stash[_SEED_CACHE] = {}
+
+
+def pytest_report_header(config: pytest.Config) -> str | None:
+    if live_mode(config):
+        return (
+            "fingest: LIVE mode - cloud fixtures without mock= read from real "
+            "S3/GCS/Azure using your ambient credentials"
+        )
+    return None
+
+
+def seed_store(config: pytest.Config, provider: str) -> ObjectStore:
+    """The provider's seed data, read from disk once per session.
+
+    Treat it as read-only; tests get independent copies via the fake fixtures.
+    """
+    cache = config.stash[_SEED_CACHE]
+    if provider not in cache:
+        store = ObjectStore()
+        root = provider_root(config, provider)
+        if root.is_dir():
+            store.load_dir(root)
+        cache[provider] = store
+    return cache[provider]
+
+
+def _fake(request: pytest.FixtureRequest, fake: FakeCloud) -> Iterator[FakeCloud]:
+    fake.store = seed_store(request.config, fake.provider).copy()
+    with fake:
+        yield fake
+
+
+@pytest.fixture
+def fake_s3(request: pytest.FixtureRequest) -> Iterator[FakeS3]:
+    """Simulated AWS S3, seeded from ``fingest_s3_root``.
+
+    Every boto3/botocore S3 client is served from memory for the duration of the
+    test; writes never touch the seed files and never leak into other tests.
+    """
+    from fingest.cloud.s3 import FakeS3
+
+    # Dummy credentials: avoids slow credential-chain lookups (EC2 metadata) and
+    # guarantees real credentials are never used while S3 is faked.
+    with pytest.MonkeyPatch.context() as mp:
+        for name, value in _AWS_TEST_ENV.items():
+            mp.setenv(name, value)
+        for name in ("AWS_PROFILE", "AWS_SESSION_TOKEN", "AWS_SECURITY_TOKEN"):
+            mp.delenv(name, raising=False)
+        yield from _fake(request, FakeS3())  # type: ignore[misc]
+
+
+@pytest.fixture
+def fake_gcs(request: pytest.FixtureRequest) -> Iterator[FakeGCS]:
+    """Simulated Google Cloud Storage, seeded from ``fingest_gcs_root``."""
+    from fingest.cloud.gcs import FakeGCS
+
+    yield from _fake(request, FakeGCS())  # type: ignore[misc]
+
+
+@pytest.fixture
+def fake_azure_blob(request: pytest.FixtureRequest) -> Iterator[FakeAzureBlob]:
+    """Simulated Azure Blob Storage, seeded from ``fingest_azure_root``."""
+    from fingest.cloud.azure import FakeAzureBlob
+
+    yield from _fake(request, FakeAzureBlob())  # type: ignore[misc]

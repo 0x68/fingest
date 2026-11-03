@@ -1,38 +1,60 @@
-"""Fingest - Pytest plugin for data-driven fixtures.
+"""fingest — data-driven pytest fixtures and local cloud storage simulation.
 
-This plugin allows you to easily define data-driven fixtures based on external files.
-It supports JSON, CSV, and XML data sources, and can automatically instantiate
-Python classes or functions using this data.
+* ``@data_fixture`` turns JSON/CSV/XML (or any registered format) files into
+  pytest fixtures.
+* ``fake_s3``, ``fake_gcs`` and ``fake_azure_blob`` simulate cloud object
+  storage in memory, seeded from local folders, so code using boto3,
+  google-cloud-storage or azure-storage-blob runs unchanged in tests.
 """
 
-from .adapters import (
-    AzureBlobAdapter,
-    CloudAdapter,
-    GCSAdapter,
-    S3Adapter,
-    aws_bucket_fixture,
-    azure_blob_fixture,
-    gcs_fixture,
-)
-from .plugin import data_fixture, register_loader
-from .types import BaseFixture, CSVFixture, JSONFixture, XMLFixture
+from __future__ import annotations
 
-__version__ = "0.1.0"
-__author__ = "Tim Fiedler"
-__email__ = "tim@0x68.de"
+from importlib.metadata import PackageNotFoundError, version
+from typing import TYPE_CHECKING, Any
+
+from fingest.cloud.decorators import aws_bucket_fixture, azure_blob_fixture, gcs_fixture
+from fingest.cloud.store import ObjectStore
+from fingest.fixtures import data_fixture
+from fingest.loaders import register_loader, register_parser
+from fingest.types import BaseFixture, CSVFixture, JSONFixture, XMLFixture
+
+try:
+    __version__ = version("fingest")
+except PackageNotFoundError:  # pragma: no cover
+    __version__ = "0.0.0"
 
 __all__ = [
-    "data_fixture",
-    "register_loader",
     "BaseFixture",
-    "JSONFixture",
     "CSVFixture",
+    "FakeAzureBlob",
+    "FakeGCS",
+    "FakeS3",
+    "JSONFixture",
+    "ObjectStore",
     "XMLFixture",
     "aws_bucket_fixture",
-    "gcs_fixture",
     "azure_blob_fixture",
-    "CloudAdapter",
-    "S3Adapter",
-    "GCSAdapter",
-    "AzureBlobAdapter",
+    "data_fixture",
+    "gcs_fixture",
+    "register_loader",
+    "register_parser",
 ]
+
+if TYPE_CHECKING:
+    from fingest.cloud.azure import FakeAzureBlob
+    from fingest.cloud.gcs import FakeGCS
+    from fingest.cloud.s3 import FakeS3
+
+_LAZY = {
+    "FakeS3": "fingest.cloud.s3",
+    "FakeGCS": "fingest.cloud.gcs",
+    "FakeAzureBlob": "fingest.cloud.azure",
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in _LAZY:
+        import importlib
+
+        return getattr(importlib.import_module(_LAZY[name]), name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
